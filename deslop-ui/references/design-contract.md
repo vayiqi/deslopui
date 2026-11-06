@@ -7,12 +7,12 @@ Save as `DESIGN.md` at the product root and mirror it as CSS custom properties o
 | Token | How many | Job |
 |---|---|---|
 | ground / surface | 2–3 | Near-neutral, tinted slightly toward the brand hue. Never pure #000 or #fff. In dark mode a surface is one step lighter than the ground. |
-| ink / muted | 2 | Body text at 7:1 or more. Muted only for labels, dates and metadata, at 4.5:1 or more. |
-
-Write the measured contrast next to every text and control colour, on every ground it is used on, in both themes. AA minimums (WCAG 2.2): text 4.5:1, large text 3:1, controls, meaningful icons and focus rings 3:1. A pair that fails is not in the contract. State colours are paired with an icon or a word, never colour alone, and checked under colour-blindness simulation.
+| ink / muted | 2 | Body text at 7:1 or more (house rule; AA is 4.5:1). Muted only for labels, dates and metadata, at 4.5:1 or more. |
 | brand | 1, at most 2 | Identity. |
 | accent | 1 | Only the primary action, focus ring and current state. At most 5% of any viewport. |
 | state | up to 3 | Success, warning, error. Only for state. |
+
+Write the measured contrast next to every text and control colour, on every ground it is used on, in both themes. AA minimums (WCAG 2.2): text 4.5:1, large text 3:1, controls, meaningful icons and focus rings 3:1. A pair that fails is not in the contract. State colours are paired with an icon or a word, never colour alone, and checked under colour-blindness simulation.
 
 ## 2. Type
 
@@ -32,9 +32,12 @@ Write the measured contrast next to every text and control colour, on every grou
 
 One authored moment per screen, exponential ease-out, a `prefers-reduced-motion` fallback. No bounce, no auto-scroll, no pulsing dots. Anything moving for more than 5 seconds has a pause.
 
-## 5. Waivers
+## 5. Budgets and waivers
 
-One line each: the rule it breaks, the reason, where it applies. Example: "Serif display on a paper ground: printed-passport metaphor, whole product." A waiver without a reason is rejected. A rule waived three times becomes part of the contract.
+The default first-view budgets are 25 words and 5 controls on phone, 40 words and 7 controls on desktop. A data-dense tool may set its own here, with a reason.
+
+
+One line each: the rule it breaks, the reason, where it applies. Example: "Uppercase 13px table headers: matches the exported CSV, data tables only." A waiver without a reason is rejected. A rule waived three times becomes part of the contract.
 
 ## 6. References
 

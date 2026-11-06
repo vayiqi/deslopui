@@ -6,6 +6,8 @@ Run the deslop pass as a loop: blind experts score, an Oracle merges the scores 
 
 The loop is opt-in. Before every run, ask the user whether to turn it on, and say what it costs (10 jurors per round, up to the round limit). Without a yes, do a single deslop pass instead.
 
+`$SKILL` below is the folder that holds `SKILL.md`. The two agents in `$SKILL/agents/` must be installed as Claude Code subagents (copied to `.claude/agents/` or `~/.claude/agents/`). In other tools, start a fresh agent with the agent file's body as its instructions.
+
 ## Inputs (ask the user once, then run)
 
 | Input | Default | Notes |
@@ -16,21 +18,23 @@ The loop is opt-in. Before every run, ask the user whether to turn it on, and sa
 | Target score | 8.5 | Every unit must reach it. |
 | Max rounds | 6 | Hard stop. |
 | Jurors per round | 10 | Fewer (3–4) is fine for small changes; 10 gives a steadier average. |
+| Lens 6 | – | The expert in the product's own domain. |
 
 ## One round
 
 ```
-1. Check      node scripts/structure-check.mjs <url> [--phone]   -> round-N/check-*.json
-2. Score      10 deslop-juror agents in parallel, each new        -> round-N/juror-01.json ... juror-10.json
-3. Aggregate  node scripts/aggregate.mjs round-N [round-(N-1)]    -> round-N/summary.json
-4. Brief      deslop-oracle agent reads summary.json              -> round-N/brief.md
-5. Build      the builder applies brief.md, nothing else
+1. Check      node "$SKILL/scripts/structure-check.mjs" <url> --units A,B [--phone] --out round-N/check-<screen>-<device>.json
+2. Score      10 deslop-juror agents in parallel, each new          -> round-N/juror-01.json ... juror-10.json
+3. Aggregate  node "$SKILL/scripts/aggregate.mjs" round-N [round-(N-1)] --target T --round N --max-rounds M
+                                                                     -> round-N/summary.json
+4. Brief      deslop-oracle agent reads summary.json and the fixes   -> round-N/brief.md
+5. Build      the builder applies brief.md, nothing else (only on continue)
 6. Decide     stop or next round (rules below)
 ```
 
 ### 2. Jurors
 
-- **Blind.** Each juror is a new agent that has never seen the product. It gets the URL, the product sentence, the units, its lens and the output format. Nothing else: no history, no earlier scores, no builder notes, no "what changed", no screenshots you took.
+- **Blind.** Each juror is a new agent that has never seen the product. It gets the URL, the product sentence, the units, its lens, the path of `values.md` and its output file. Nothing else: no history, no earlier scores, no builder notes, no "what changed", no screenshots you took.
 - **Never reused.** Every round starts 10 new jurors.
 - **Ten different lenses**, one per juror, so the panel is not one opinion ten times:
 
@@ -63,13 +67,15 @@ The loop is opt-in. Before every run, ask the user whether to turn it on, and sa
 
 ### 3. Aggregate (deterministic, no model)
 
-`scripts/aggregate.mjs` computes, per unit and dimension:
+`scripts/aggregate.mjs` first checks every juror file. A unit without all six scores, or with a score outside 1–10, is skipped with a reason (listed in `skipped`); rerun that juror. Then, per unit and dimension:
 
-- **Trimmed mean**: drop the single highest and lowest score, average the rest. With fewer than 5 jurors it uses the plain mean.
-- **Spread**: highest minus lowest. A spread above 3 on a dimension is flagged for the Oracle.
+- **Trimmed mean**: with 5 or more jurors, drop the single highest and lowest score and average the rest. With fewer, the median.
+- **Spread**: highest minus lowest. A spread above 3 marks the dimension `disputed` for the Oracle.
 - **Unit score**: mean of the six dimension scores, capped at the lowest dimension + 1.5, so one weak area cannot hide.
+- **Floor cap**: if a `check-*.json` in the round folder fails the Floor (its `floor` list is not empty), every unit it names in `units` is capped at 7.0. A check without `units` caps every unit.
 - **Overall**: mean of the unit scores.
-- **Delta** against the previous round, if given.
+- **Delta** against the previous round, if given, and **regressions**: units that dropped by more than 0.5.
+- **Plateau band**: twice the standard error of the jurors' own overall scores, and never less than 0.2. A move inside the band is noise.
 - **Decision**: `target-reached`, `plateau`, `max-rounds` or `continue`.
 
 ### 4. Oracle
@@ -80,7 +86,7 @@ One `deslop-oracle` agent reads `summary.json` and every juror's fixes. It does 
 2. Ranks them: P0 and P1 first, then by how many jurors raised it, then by the lowest dimension it lifts.
 3. Drops fixes that break the design contract, add text or features, or contradict a fix ranked higher.
 4. Writes `brief.md`: at most 8 fixes, each with unit, dimension, the change in one buildable sentence, and how many jurors raised it.
-5. On a plateau, writes 2–3 bolder directions instead of fixes, for the user to choose from.
+5. On a plateau, writes 2–3 bolder directions instead of fixes, for the user to choose from. On target reached or max rounds, lists the open fixes as a report, not for building.
 
 ### 5. Builder
 
@@ -91,9 +97,9 @@ Applies `brief.md` and nothing else, following the deslop method in `SKILL.md` (
 | Rule | Condition | Then |
 |---|---|---|
 | Target reached | Every unit at or above the target score | Stop, report. |
-| Plateau | Overall moved by 0.2 or less, two rounds in a row | Stop polishing. The Oracle proposes 2–3 bolder directions; the user picks one, and the loop restarts from it. |
+| Plateau | Overall moved within the plateau band (at least ±0.2), two rounds in a row | Stop polishing. The Oracle proposes 2–3 bolder directions; the user picks one, and the loop restarts from it. |
 | Max rounds | Round limit hit | Stop, report the last scores and open fixes. |
-| Regression | A unit drops by more than 0.5 | Revert that unit's change before the next round. |
+| Regression | A unit drops by more than 0.5 | Revert that unit's last change before the next round. |
 
 Report only the aggregated scores from fresh jurors. Never report a builder's or the Oracle's own opinion as a score.
 
@@ -102,7 +108,7 @@ Report only the aggregated scores from fresh jurors. Never report a builder's or
 ```
 deslop-review/
   round-1/
-    check-desktop.json  check-phone.json
+    check-home-desktop.json  check-home-phone.json
     juror-01.json ... juror-10.json
     summary.json
     brief.md

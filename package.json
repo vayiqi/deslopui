@@ -1,0 +1,21 @@
+{
+  "name": "deslopui",
+  "version": "1.0.0",
+  "description": "A skill that removes the machine-made look from a product UI by subtraction, with a structural check and an opt-in blind grading loop.",
+  "license": "MIT",
+  "author": "Yiqi Zhao",
+  "repository": { "type": "git", "url": "git+https://github.com/vayiqi/deslopui.git" },
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "bin": {
+    "deslop-check": "deslop-ui/scripts/structure-check.mjs",
+    "deslop-aggregate": "deslop-ui/scripts/aggregate.mjs"
+  },
+  "files": ["deslop-ui", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "peerDependencies": { "playwright": ">=1.40" },
+  "peerDependenciesMeta": { "playwright": { "optional": true } },
+  "devDependencies": { "playwright": "1.63.0" }
+}
