@@ -6,14 +6,14 @@
   "author": "Yiqi Zhao",
   "repository": { "type": "git", "url": "git+https://github.com/vayiqi/deslopui.git" },
   "type": "module",
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=20" },
   "bin": {
     "deslop-check": "deslop-ui/scripts/structure-check.mjs",
     "deslop-aggregate": "deslop-ui/scripts/aggregate.mjs"
   },
   "files": ["deslop-ui", "README.md", "LICENSE"],
   "scripts": {
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test"
   },
   "peerDependencies": { "playwright": ">=1.40" },
   "peerDependenciesMeta": { "playwright": { "optional": true } },

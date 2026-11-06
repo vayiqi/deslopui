@@ -21,6 +21,7 @@ const unitScore = dimMeans => { const v = Object.values(dimMeans); return Math.m
 export function validateJuror(data, file) {
   const problems = [];
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { units: [], problems: [`${file}: not a JSON object`] };
+  if (typeof data.error === 'string') return { units: [], problems: [`${file}: the juror could not judge: ${data.error}`] };
   if (!Array.isArray(data.units)) return { units: [], problems: [`${file}: no "units" array`] };
   const units = [];
   for (const [i, u] of data.units.entries()) {
@@ -41,7 +42,7 @@ export function aggregate(jurors, { prev = null, checks = [], target = 8.5, roun
   const names = [...new Set(jurors.flatMap(j => j.units.map(u => u.u)))];
   if (!names.length) throw new Error('No valid unit scores in this round.');
   const units = names.map(name => {
-    const entries = jurors.flatMap(j => { const e = j.units.find(u => u.u === name); return e ? [{ juror: j.lens || j.file, e }] : []; });
+    const entries = jurors.flatMap(j => { const e = j.units.find(u => u.u === name); return e ? [{ juror: j.file, lens: j.lens, e }] : []; });
     const dims = {};
     for (const d of DIMS) {
       const xs = entries.map(x => x.e.sub[d]);
@@ -55,7 +56,8 @@ export function aggregate(jurors, { prev = null, checks = [], target = 8.5, roun
     return {
       u: name, score, uncapped: r1(raw), lowest, jurors: entries.length, dims,
       disputed: DIMS.filter(d => dims[d].spread > 3), floor: floorFails,
-      fixes: entries.flatMap(x => x.e.fixes.map(f => ({ ...f, juror: x.juror }))),
+      capped: floorFails.length > 0 && raw > FLOOR_CAP,
+      fixes: entries.flatMap(x => x.e.fixes.map(f => ({ ...f, juror: x.juror, lens: x.lens }))),
     };
   });
 
@@ -105,14 +107,16 @@ function main() {
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '-h' || args[i] === '--help') { console.log(usage); return; }
     if (args[i].startsWith('--')) {
-      const k = args[i], v = Number(args[i + 1]);
+      let k = args[i], raw;
+      if (k.includes('=')) [k, raw] = [k.slice(0, k.indexOf('=')), k.slice(k.indexOf('=') + 1)]; else raw = args[++i];
+      const v = Number(raw);
       if (!['--target', '--round', '--max-rounds'].includes(k)) { console.error(`Unknown option ${k}\n${usage}`); process.exit(1); }
-      if (!Number.isFinite(v)) { console.error(`${k} needs a number\n${usage}`); process.exit(1); }
-      flags[k] = v; i++;
+      if (raw === undefined || raw === '' || !Number.isFinite(v)) { console.error(`${k} needs a number\n${usage}`); process.exit(1); }
+      flags[k] = v;
     } else pos.push(args[i]);
   }
   const [dir, prevDir] = pos;
-  if (!dir) { console.error(usage); process.exit(1); }
+  if (!dir || pos.length > 2) { console.error(pos.length > 2 ? `Unexpected argument ${pos[2]}\n${usage}` : usage); process.exit(1); }
   const round = flags['--round'] ?? (Number(basename(resolve(dir)).match(/(\d+)$/)?.[1]) || null);
 
   let loaded;
@@ -123,7 +127,8 @@ function main() {
   if (prevDir) {
     const p = join(prevDir, 'summary.json');
     if (!existsSync(p)) { console.error(`No summary.json in ${prevDir}; run this script on that round first.`); process.exit(1); }
-    prev = readJson(p);
+    try { prev = readJson(p); if (typeof prev?.overall !== 'number' || !Array.isArray(prev.units)) throw new Error('not a summary from this script'); }
+    catch (e) { console.error(`Cannot read ${p}: ${e.message.split('\n')[0]}`); process.exit(1); }
   }
   let summary;
   try { summary = aggregate(loaded.jurors, { prev, checks: loaded.checks, round, target: flags['--target'] ?? 8.5, maxRounds: flags['--max-rounds'] ?? 6 }); }
@@ -133,7 +138,7 @@ function main() {
 
   const d = summary.delta;
   console.log(`round ${summary.round ?? '?'}  jurors ${summary.jurors}  overall ${summary.overall}${d !== null ? ` (${d >= 0 ? '+' : ''}${d}; moves within ±${summary.plateauBand} are noise)` : ''}  target ${summary.target}  decision ${summary.decision}`);
-  for (const u of summary.units) console.log(`${u.u.padEnd(10)} ${u.score.toFixed(1).padStart(4)}  lowest ${u.lowest}${u.floor.length ? '  floor-capped' : ''}${u.disputed.length ? `  disputed ${u.disputed.join(',')}` : ''}  fixes ${u.fixes.length}`);
+  for (const u of summary.units) console.log(`${u.u.padEnd(10)} ${u.score.toFixed(1).padStart(4)}  lowest ${u.lowest}${u.capped ? '  floor-capped' : u.floor.length ? '  floor-fails' : ''}${u.disputed.length ? `  disputed ${u.disputed.join(',')}` : ''}  fixes ${u.fixes.length}`);
   if (summary.regressions.length) console.log(`regressions: ${summary.regressions.join(', ')}`);
 }
 

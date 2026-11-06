@@ -29,7 +29,8 @@ test('fixes are credited to the juror who wrote them, even when another juror sk
     juror('copy editor', [['NAV', 7], ['CARD', 6, [{ dim: 'TXT', sev: 'P1', fix: 'Cut the caption.' }]]]),
   ]);
   const card = s.units.find(u => u.u === 'CARD');
-  assert.equal(card.fixes[0].juror, 'copy editor');
+  assert.equal(card.fixes[0].lens, 'copy editor');
+  assert.equal(card.fixes[0].juror, 'juror-copy editor.json');
   assert.equal(card.jurors, 1);
 });
 
@@ -46,6 +47,7 @@ test('incomplete or out-of-range units are rejected with a reason', () => {
   assert.deepEqual(validateJuror([], 'x').units, []);
   assert.deepEqual(validateJuror(null, 'x').units, []);
   assert.match(validateJuror({}, 'x').problems[0], /units/);
+  assert.match(validateJuror({ lens: 'a', error: 'page did not load' }, 'x').problems[0], /page did not load/);
 });
 
 test('a failed structural Floor caps the unit at 7.0', () => {
@@ -53,6 +55,9 @@ test('a failed structural Floor caps the unit at 7.0', () => {
   const s = aggregate(j, { checks: [{ file: 'check-phone.json', floor: ['lowContrast'], units: ['NAV'] }] });
   assert.equal(s.units.find(u => u.u === 'NAV').score, 7);
   assert.equal(s.units.find(u => u.u === 'CARD').score, 9);
+  assert.equal(s.units.find(u => u.u === 'NAV').capped, true);
+  const low = aggregate([juror('a', [['NAV', 6]])], { checks: [{ file: 'c', floor: ['lowContrast'], units: null }] });
+  assert.equal(low.units[0].capped, false, 'a score already under 7.0 is not reported as capped');
   const all2 = aggregate(j, { checks: [{ file: 'check-desktop.json', floor: ['smallTargets'], units: null }] });
   assert.ok(all2.units.every(u => u.score === 7));
 });
@@ -100,4 +105,10 @@ test('CLI: writes summary.json, infers the round, reports bad files and fails cl
   assert.equal(e.status, 1);
   assert.match(e.stderr, /No usable/);
   assert.equal(spawnSync(process.execPath, [script, dir, '--target', 'high']).status, 1);
+  assert.equal(spawnSync(process.execPath, [script, dir, '--target=9']).status, 0);
+  assert.equal(spawnSync(process.execPath, [script, dir, 'a', 'b']).status, 1, 'extra arguments are refused');
+  const bad = join(root, 'round-0'); mkdirSync(bad); writeFileSync(join(bad, 'summary.json'), '{oops');
+  const c = spawnSync(process.execPath, [script, dir, bad], { encoding: 'utf8' });
+  assert.equal(c.status, 1);
+  assert.match(c.stderr, /^Cannot read .*summary.json/m);
 });

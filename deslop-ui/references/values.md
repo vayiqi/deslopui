@@ -2,7 +2,7 @@
 
 Twelve values behind every rule in this skill. When a rule does not cover a case, decide by these. Each value names its roots, what it looks like when it is met, a question to ask on any screen, and how to check it.
 
-The values are our own synthesis. They draw on Apple's Human Interface Guidelines (clarity, deference, hierarchy, consistency), Dieter Rams' ten principles of good design, Jakob Nielsen's ten usability heuristics, the Laws of UX (Fitts, Hick, Jakob, Miller, Tesler, Doherty, peak-end, Von Restorff), Amber Case's calm technology, Microsoft's inclusive design and WCAG 2.2. Read the originals; this page is a working summary, not a quote.
+The values are our own synthesis. They draw on Apple's Human Interface Guidelines (clarity, deference, hierarchy, consistency), Dieter Rams' ten principles of good design, Jakob Nielsen's ten usability heuristics, the Laws of UX (Fitts, Hick, Jakob, Tesler, Doherty, peak-end, Von Restorff), Amber Case's calm technology, Microsoft's inclusive design and WCAG 2.2. Read the originals; this page is a working summary, not a quote.
 
 ## 1. Content first, chrome second
 
@@ -60,7 +60,7 @@ People spend most of their time in other products. Use the patterns they know, a
 
 ## 7. Recognition over recall
 
-*Roots: Nielsen "recognition rather than recall"; Miller's law; Hick's law.*
+*Roots: Nielsen "recognition rather than recall"; Hick's law.*
 
 Show options instead of asking people to remember them. Keep choices few and grouped; decision time grows with every option.
 
@@ -83,7 +83,7 @@ People can undo, go back and leave without penalty. Mistakes are prevented by de
 Important targets are large and near where the hand or pointer already is. Small, distant or crowded targets are reserved for rare actions.
 
 - Ask: on a phone held in one hand, can I reach the main action with my thumb?
-- Check: targets at least 44 by 44 px; the primary action sits in the reachable zone on phones; at least 8 px between adjacent targets.
+- Check: targets at least 24 by 24 px (WCAG 2.5.8); house rule 44 by 44 px on touch screens with 8 px between adjacent targets; the primary action sits in the reachable zone on phones.
 
 ## 10. Honest
 
@@ -101,7 +101,7 @@ The interface never pretends: no fake urgency, no hidden costs, no pre-ticked co
 Design for the edges and the middle benefits: low vision, colour blindness, one hand, slow networks, screen readers, other languages.
 
 - Ask: does this still work with the screen in greyscale, at 200% zoom, with a keyboard only, in the longest language?
-- Check: AA contrast; meaning never by colour alone; visible focus; text reflows at 200%; every control has an accessible name.
+- Check: AA contrast; meaning never by colour alone; visible focus; text resizes to 200% (1.4.4) and reflows at 320 px wide (1.4.10); every control has an accessible name.
 
 ## 12. Careful to the last detail
 

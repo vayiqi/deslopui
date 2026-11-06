@@ -19,8 +19,8 @@ Write the measured contrast next to every text and control colour, on every grou
 - One ramp of 5–6 steps, adjacent steps at least 1.25× apart where possible (for example 13 / 16 / 20 / 28 / 56).
 - At most 4 sizes on one screen (logo excluded), at most 3 weights, at most 3 families (display, body, one utility).
 - Monospace only for code, measurements and data.
-- Nothing under 13px. Body text 16px or more, line height 1.5–1.7, line length 45–75 characters.
-- Sentence case. No small caps or uppercase labels at 15px or smaller, no letter-spacing above 0.03em on small text.
+- *House rule:* nothing under 13px. Body text 16px or more, line height 1.5–1.7, line length 45–75 characters.
+- *House rule:* sentence case. No small caps or uppercase labels at 15px or smaller, no letter-spacing above 0.03em on small text.
 
 ## 3. Shape and depth
 
@@ -32,13 +32,15 @@ Write the measured contrast next to every text and control colour, on every grou
 
 One authored moment per screen, exponential ease-out, a `prefers-reduced-motion` fallback. No bounce, no auto-scroll, no pulsing dots. Anything moving for more than 5 seconds has a pause.
 
-## 5. Budgets and waivers
+## 5. Budgets
 
 The default first-view budgets are 25 words and 5 controls on phone, 40 words and 7 controls on desktop. A data-dense tool may set its own here, with a reason.
 
+## 6. Waivers
 
-One line each: the rule it breaks, the reason, where it applies. Example: "Uppercase 13px table headers: matches the exported CSV, data tables only." A waiver without a reason is rejected. A rule waived three times becomes part of the contract.
 
-## 6. References
+One line each: the rule it breaks, the reason, where it applies. Example: "Uppercase 13px table headers: matches the exported CSV, data tables only." A waiver without a reason is rejected. A rule waived three times becomes part of the contract. Only house rules can be waived, never WCAG AA. Pass the waived checks to the script: `--waive tinyCaps,smallText`.
+
+## 7. References
 
 2–3 real screenshots or wireframes for the builder: the product's own UI first, then admired products in the category. Reviewers never get them.

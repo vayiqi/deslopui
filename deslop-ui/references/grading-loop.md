@@ -6,13 +6,16 @@ Run the deslop pass as a loop: blind experts score, an Oracle merges the scores 
 
 The loop is opt-in. Before every run, ask the user whether to turn it on, and say what it costs (10 jurors per round, up to the round limit). Without a yes, do a single deslop pass instead.
 
-`$SKILL` below is the folder that holds `SKILL.md`. The two agents in `$SKILL/agents/` must be installed as Claude Code subagents (copied to `.claude/agents/` or `~/.claude/agents/`). In other tools, start a fresh agent with the agent file's body as its instructions.
+`$SKILL` below stands for the absolute path of the folder that holds `SKILL.md`; substitute it before running a command. The two agents in `$SKILL/agents/` run best installed as Claude Code subagents (copied to `.claude/agents/` or `~/.claude/agents/`). Where they are not installed, or in other tools, start a fresh general-purpose agent with the agent file's body as its instructions.
+
+Jurors use the product for real, ten at a time. Give them a local build, a staging URL or a test account, never a live account with real money or real people on the other end.
 
 ## Inputs (ask the user once, then run)
 
 | Input | Default | Notes |
 |---|---|---|
-| Target | the live URL | Or a local build served over HTTP. Jurors open it themselves. |
+| URL | – | A local build served over HTTP, or staging. Jurors open it themselves. |
+| Sign-in | none | A test account, or a Playwright storage-state file (`--storage-state` in the check), for screens behind a sign-in. |
 | Product sentence | – | One sentence: what it is, who it is for. The only context jurors get. |
 | Units | – | 3–12 named parts to score, one line each ("NAV: top navigation", "CARD: the task card"). |
 | Target score | 8.5 | Every unit must reach it. |
@@ -23,7 +26,7 @@ The loop is opt-in. Before every run, ask the user whether to turn it on, and sa
 ## One round
 
 ```
-1. Check      node "$SKILL/scripts/structure-check.mjs" <url> --units A,B [--phone] --out round-N/check-<screen>-<device>.json
+1. Check      node "$SKILL/scripts/structure-check.mjs" <url> --units A,B [--phone] [--waive k] --out round-N/check-<screen>-<device>.json
 2. Score      10 deslop-juror agents in parallel, each new          -> round-N/juror-01.json ... juror-10.json
 3. Aggregate  node "$SKILL/scripts/aggregate.mjs" round-N [round-(N-1)] --target T --round N --max-rounds M
                                                                      -> round-N/summary.json
@@ -67,7 +70,7 @@ The loop is opt-in. Before every run, ask the user whether to turn it on, and sa
 
 ### 3. Aggregate (deterministic, no model)
 
-`scripts/aggregate.mjs` first checks every juror file. A unit without all six scores, or with a score outside 1–10, is skipped with a reason (listed in `skipped`); rerun that juror. Then, per unit and dimension:
+`scripts/aggregate.mjs` first checks every juror file. A unit without all six scores, or with a score outside 1–10, is skipped with a reason (listed in `skipped`), and so is a juror that wrote an `error`. Rerun a skipped juror once as a new agent; if it fails again, go on, as long as at least 5 jurors scored every unit. Then, per unit and dimension:
 
 - **Trimmed mean**: with 5 or more jurors, drop the single highest and lowest score and average the rest. With fewer, the median.
 - **Spread**: highest minus lowest. A spread above 3 marks the dimension `disputed` for the Oracle.
@@ -90,14 +93,14 @@ One `deslop-oracle` agent reads `summary.json` and every juror's fixes. It does 
 
 ### 5. Builder
 
-Applies `brief.md` and nothing else, following the deslop method in `SKILL.md` (cuts before rewrites, no new text to explain confusion). Builders never see scores and never score their own work.
+Applies `brief.md` and nothing else, using the build rules in step 5 of `SKILL.md` (cuts before rewrites, no new text to explain confusion). The builder may run the aggregator and read `summary.json` to decide whether to stop, but never scores its own work and never tells jurors what changed.
 
 ## Stopping
 
 | Rule | Condition | Then |
 |---|---|---|
 | Target reached | Every unit at or above the target score | Stop, report. |
-| Plateau | Overall moved within the plateau band (at least ±0.2), two rounds in a row | Stop polishing. The Oracle proposes 2–3 bolder directions; the user picks one, and the loop restarts from it. |
+| Plateau | Overall moved within the plateau band (at least ±0.2), two rounds in a row | Stop polishing. The Oracle proposes 2–3 bolder directions; the user picks one. Build it, then start a new series in `deslop-review/direction-2/round-1`: round numbers, the round limit and the plateau count start again, and its round 1 has no previous folder. |
 | Max rounds | Round limit hit | Stop, report the last scores and open fixes. |
 | Regression | A unit drops by more than 0.5 | Revert that unit's last change before the next round. |
 
@@ -114,6 +117,8 @@ deslop-review/
     brief.md
   round-2/
   ...
+  direction-2/          after a plateau, a new series
+    round-1/
 ```
 
 ## Cost

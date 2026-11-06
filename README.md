@@ -17,7 +17,7 @@ It covers:
 
 ## Requirements
 
-- Node 18 or later.
+- Node 20 or later (Playwright needs it).
 - Playwright with Chromium, for the structural check and for jurors to open your product:
 
   ```sh
@@ -25,7 +25,7 @@ It covers:
   npx playwright install chromium
   ```
 
-  The script finds Playwright in your project, next to the skill, or installed globally.
+  The script finds Playwright in your project, next to the skill, or in the global npm folder (`npm i -g playwright`).
 
 ## Install
 
@@ -40,7 +40,7 @@ cp -r /tmp/deslopui/deslop-ui .claude/skills/
 cp /tmp/deslopui/deslop-ui/agents/*.md .claude/agents/
 ```
 
-For every project, use `~/.claude/skills` and `~/.claude/agents` instead.
+For every project, use `~/.claude/skills` and `~/.claude/agents` instead. The skill folder keeps its own copy of the agents so it can start them as general-purpose agents where they are not installed.
 
 On Windows (PowerShell):
 
@@ -52,6 +52,8 @@ Copy-Item $env:TEMP\deslopui\deslop-ui\agents\*.md .claude\agents\
 ```
 
 Restart Claude Code so it sees the new agents. It loads the skill when you ask for a de-slop, taste or "this looks AI-generated" pass, or you can name it: "use deslop-ui on the settings page". It asks whether to run the grading loop before it starts.
+
+Point it, and the jurors, at a local build, a staging site or a test account. They use the product for real, and the skill tells them never to pay, send, delete or change settings, but a staging site is the safe default.
 
 ### Claude apps
 
@@ -68,16 +70,22 @@ node deslop-ui/scripts/structure-check.mjs https://example.com            # desk
 node deslop-ui/scripts/structure-check.mjs https://example.com --phone    # phone 390x844
 ```
 
-If you installed with npm (`npm i -D github:vayiqi/deslopui`), the same commands are `npx deslop-check` and `npx deslop-aggregate`.
+A local file works too: `node deslop-ui/scripts/structure-check.mjs dist/index.html`.
+
+If you installed with npm (`npm i -D github:vayiqi/deslopui`), the same commands are `npx deslop-check` and `npx deslop-aggregate`; copy `node_modules/deslopui/deslop-ui` into `.claude/skills/` as above to use the skill.
 
 | Flag | Does |
 |---|---|
-| `--phone` | iPhone viewport, touch and user agent |
+| `--phone` | iPhone 390x844, touch, user agent; targets must be 44px (24px on desktop) |
+| `--dark` | Emulate `prefers-color-scheme: dark` |
+| `--storage-state f.json` | Playwright storage state, for screens behind a sign-in |
+| `--waive tinyCaps,smallText` | House rules your design contract waives (WCAG rules cannot be waived) |
+| `--json` | Print the JSON result instead of the table |
 | `--click "selector"` | Click before measuring, to reach a state; repeat for several steps |
 | `--wait ms` | Wait after load and after each click (default 3000) |
 | `--units A,B` | Name the scored units on this screen, for the grading loop |
 | `--out file.json` | Save the full result |
-| `--shot file.jpg` | Save a screenshot of the measured state |
+| `--shot file.jpg` | Save a screenshot of the measured state (`.png` for PNG) |
 
 Sample output:
 
@@ -93,22 +101,26 @@ tinyCaps            1  floor
 middleDots          1
 smallTargets        3  floor
 lowContrast         1  floor
-contrastUnknown     1  (text over images, gradients or canvas: check by eye)
-Floor: fails controlInControl, lowContrast, smallText, tinyCaps, smallTargets
+contrastUnknown     1  (check by eye: text over images, gradients, canvas, blend modes or shadows)
+Floor: fails controlInControl, lowContrast, smallTargets, smallText, tinyCaps
 ```
 
-The JSON lists every hit with its element and text (repeats as `x3`), so you can find it in the code. Rows marked `floor` block shipping; the others are candidates the skill judges. A segmented control's thumb or a waived brand element can be fine. It measures first view only, or the state after `--click`; text over images, video or canvas is counted as `contrastUnknown` for you to check by eye.
+Exit code 0 means the Floor passes, 2 that it fails, 1 that the check could not run, so you can use it as a CI gate. Words or controls over the first-view budget print an `Over budget` line; the script cannot tell interface text from content, so that is for you to judge.
+
+The JSON lists every hit with its element and text (repeats as `x3`), so you can find it in the code. Rows marked `floor` block shipping; the others are candidates the skill judges. A segmented control's thumb or a waived brand element can be fine. Colours in any CSS format (hex, rgb, oklch, lab, color-mix) are read as the browser paints them. Disabled controls and visually hidden text are skipped, and a checkbox counts its label as part of its target.
+
+What it does not measure: anything below the first view (use `--click` to reach other states), placeholder text, non-text contrast (borders, icons), focus visibility, and text over images, video or canvas (`contrastUnknown`). Check those by eye.
 
 ## Grading loop
 
-When you start a pass, the skill asks whether to run the loop, then once for the target score (default 8.5), the round limit (default 6), a one-sentence product description and the units to score. Each round:
+When you start a pass, the skill asks whether to run the loop and, in the same message, for the target score (default 8.5), the round limit (default 6), the URL, a test account if needed, a one-sentence product description, the units to score and the domain expert for lens 6. Each round:
 
 1. 10 new `deslop-juror` agents, each with a different expert lens (product designer, interaction designer, typographer, accessibility, brand, domain expert, first-time user, mobile, motion, copy), open the product blind and score each unit 1–10 on SYS, COL, TYP, LAY, TXT and SPEC, with fixes.
 2. `aggregate.mjs` checks every juror file, averages them (dropping the highest and lowest), caps each unit at its weakest dimension + 1.5 and at 7.0 if its screen fails the structural Floor, and decides: continue, target reached, plateau, or round limit.
 3. A `deslop-oracle` agent merges the fixes into one ranked brief of at most 8, or proposes 2–3 bolder directions on a plateau.
 4. The builder applies the brief, and the next round starts with new jurors.
 
-A plateau is two rounds in a row where the overall moves less than the panel's own noise (at least ±0.2):
+A plateau is two rounds in a row where the overall moves less than the panel's own noise (at least ±0.2). After a plateau you pick one of the Oracle's bolder directions, and a new series of rounds starts from it.
 
 ```sh
 node deslop-ui/scripts/aggregate.mjs deslop-review/round-4 deslop-review/round-3 --target 8.5 --max-rounds 6
@@ -147,7 +159,7 @@ npx playwright install chromium
 npm test
 ```
 
-CI runs the tests on Node 18 and 22.
+CI runs the tests on Node 20 and 22, on Linux.
 
 ## Licence
 

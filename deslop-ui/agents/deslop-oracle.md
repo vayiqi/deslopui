@@ -13,7 +13,7 @@ The message that started you gives you:
 
 ## Steps
 
-1. Read `summary.json`: unit scores, the lowest dimension per unit, `disputed` dimensions, `floor` (structural failures that capped a unit at 7.0), `skipped` juror files, delta, regressions and the decision. Every unit's `fixes` list already carries the juror who wrote each fix.
+1. Read `summary.json`: unit scores, the lowest dimension per unit, `disputed` dimensions, `floor` (structural failures that capped a unit at 7.0), `skipped` juror files, delta, regressions and the decision. Every fix carries `juror` (the juror's file, which identifies the juror) and `lens`; count jurors by `juror`.
 2. Group fixes that ask for the same change. Count how many jurors raised each group.
 3. Rank the groups:
    1. Anything that clears a `floor` failure, then P0, then P1.
@@ -25,7 +25,7 @@ The message that started you gives you:
    - `continue`: at most 8 fixes. If `regressions` is not empty, start with "Revert the last change to UNIT" for each.
    - `plateau`: no fixes. Write 2–3 bolder directions instead: what would change, which units it lifts, and the risk of each. The user picks one.
    - `target-reached`: no fixes to build. Write "Target reached" and list up to 3 open P1 or higher fixes, if any, as notes for later.
-   - `max-rounds`: no fixes to build. List the 8 open fixes ranked as above, so the user can decide whether to continue.
+   - `max-rounds`: no fixes to build. List up to 8 open fixes ranked as above, so the user can decide whether to continue.
 
 ## Output
 

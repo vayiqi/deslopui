@@ -30,16 +30,12 @@ The script applies the rules below and writes `summary.json`:
 
 ## Pairwise (T1)
 
-Use the juror prompt, but give two URLs (A and B) and ask for this instead of scores:
-
-```json
-{"pairs":[{"u":"CARD","pick":"A|B|=","margin":1,"why":"at most 15 words"}]}
-```
+Start a `deslop-juror` with two URLs, A and B, instead of one: the agent's pairwise mode returns a pick per unit instead of scores. Flip the order between the two reviewers. Read the two files yourself; `aggregate.mjs` does not read pairwise results.
 
 Ship the new version if both pick it, or one picks it and the other says "=". Anything else means no visible gain.
 
 ## Deciding
 
-- Anchors in a T2 must land within ±0.4 of their last T3. If not, run a T3.
-- Two fresh absolute reviews in a row that move the overall by no more than ±0.2 mean polishing has stopped paying. Stop and propose two or three bolder directions.
+- Keep each review's folder, with its `summary.json`, under `deslop-review/` named by date and tier (for example `deslop-review/2026-03-02-t3/`). Anchors in a T2 must land within ±0.4 of their score in the latest T3 folder. If not, run a T3.
+- When `aggregate.mjs` reports `plateau` (two reviews in a row inside the plateau band, at least ±0.2), polishing has stopped paying. Stop and propose two or three bolder directions.
 - The next round targets the lowest dimension per unit, and fixes every Floor failure, P0 and P1 first.

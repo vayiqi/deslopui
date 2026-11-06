@@ -9,9 +9,11 @@ The job is subtraction. A pass is judged by what it removes while a stranger sti
 
 This does not cover text that accessibility requires: a visible label on every input, the instructions a form needs to be filled in (format, required fields), and error messages that name the problem and the fix (WCAG 3.3.1, 3.3.2, 3.3.3). Those stay; write them short.
 
-**Paths.** `$SKILL` below means the folder this file is in, for example `~/.claude/skills/deslop-ui` or `.claude/skills/deslop-ui`. Run the scripts by that full path, from the product's folder. They need Node 18+ and Playwright (`npm i -D playwright && npx playwright install chromium`).
+**Paths.** `$SKILL` below is a placeholder, not a shell variable. Before running any command, replace it with the absolute path of the folder this file is in (for example `/Users/ana/.claude/skills/deslop-ui`). Run the commands from the product's folder. The scripts need Node 20+ and Playwright (`npm i -D playwright && npx playwright install chromium`).
 
-**Before you start, ask the user one question: run the grading loop or not?** The loop adds 10 blind expert jurors and an Oracle each round and repeats until a target score or a plateau, so it costs many times a single pass. If yes, also ask for the target score (default 8.5) and the round limit (default 6). If no, do a single pass and stop after step 6. Ask every time; never turn the loop on by default. Ask this once with the other loop inputs (see the grading loop section), then run without further questions.
+**Safety.** Anyone who opens the product for this skill (you, a reviewer, a juror) uses a local build, a staging URL or a test account. Never place an order, pay, send a message, invite someone, delete anything or change account settings on a live product. Where the main task ends in one of those, stop at the last step before it.
+
+**Before you start, ask the user whether to run the grading loop.** The loop adds 10 blind expert jurors and an Oracle each round and repeats until a target score or a plateau, so it costs many times a single pass. Ask every time; never turn it on by default. If yes, ask in the same message for the loop inputs listed under "Grading loop", then run without further questions. If no, do a single pass and stop after step 6. For a new product, the loop starts only after the home page passes the home gate, since before that there is nothing to grade.
 
 The rules below come from twelve values, distilled from Apple's Human Interface Guidelines, Dieter Rams, Nielsen's heuristics, the Laws of UX, calm technology and inclusive design. When a rule does not cover a case, decide by [references/values.md](references/values.md).
 
@@ -36,10 +38,10 @@ Run the structural check on each state and keep the numbers:
 
 ```
 node "$SKILL/scripts/structure-check.mjs" https://example.com/app --phone --out before.json
-node "$SKILL/scripts/structure-check.mjs" https://example.com/app --click "text=Start" --out before-play.json
+node "$SKILL/scripts/structure-check.mjs" https://example.com/app --click "text=Open menu" --out before-menu.json
 ```
 
-The script reads computed styles, not source code. Products with many stylesheets often override what the source says. It measures only what is on screen at first view (or after the clicks you give it). It reports the Floor rules it can measure (`floor` in the JSON) and the budgets it can count (`overBudget`); everything else it lists is a candidate for you to judge.
+The script reads computed styles, not source code. Products with many stylesheets often override what the source says. It measures only what is on screen at first view (or after the clicks you give it). It reports the Floor rules it can measure (`floor` in the JSON) and the budgets it can count (`overBudget`); everything else it lists is a candidate for you to judge. Use `--dark` for the dark theme, `--storage-state` for screens behind a sign-in, and `--waive` for house rules the contract waives. It cannot measure placeholder text, non-text contrast (borders, icons), focus visibility, or text over images, video and canvas (`contrastUnknown`); check those by eye. Exit code 2 means the Floor fails.
 
 ## 3. Hold the rules
 
@@ -48,9 +50,9 @@ The script reads computed styles, not source code. Products with many stylesheet
 | Pattern | Rule |
 |---|---|
 | Control inside a control | One tap target per region. A card that opens something has no separate "Open" button. |
-| Chip inside a chip, pill inside a pill | A bar of buttons is one frame with no inner dividers. A segmented control shows its state with a light thumb, not a dark chip inside a pale track. |
+| Chip inside a chip, pill inside a pill | A bar of buttons is one frame with no inner dividers. A segmented control shows its state with a thumb, not a dark chip inside a pale track; the selected thumb still differs from the track at 3:1 or by weight (WCAG 1.4.11). |
 | Card inside a card | A framed block never sits inside another framed block. Controls and chips inside a card are fine. Content can sit directly on the page. |
-| One-side colour stripe | No coloured edge on the current row, a warning or a card. Show state once, by fill or text colour. |
+| One-side colour stripe | No coloured edge on the current row, a warning or a card. Show state once, with a cue that is not only colour: weight, an icon, a word, or a fill plus a visible marker (WCAG 1.4.1). |
 | Divider rules | Only between different kinds of content. Never inside a row of icons or numbers; use space. |
 | Two controls, one job | A back arrow and a "Back" button, or a "?" in the toolbar and another in the card: keep one. |
 | A fact said twice | Once per screen. A count shown as icons, as a number and as a sentence is three times. |
@@ -59,15 +61,17 @@ The script reads computed styles, not source code. Products with many stylesheet
 ### Floor: blocks shipping
 
 - Colour, font size, radius or family that is not in the contract.
-- Uppercase, small caps or letter-spacing above 0.03em on text 15px or smaller, unless a written waiver covers it.
+- *House rule:* uppercase, small caps or letter-spacing above 0.03em on text 15px or smaller, unless the contract waives it.
+- *House rule:* text under 13px, unless the contract waives it.
 - An eyebrow or kicker that only announces the heading below it.
 - Emoji used as an icon.
-- Interface text over budget. At first view, phone screens allow 25 words and 5 controls, desktop screens 40 words and 7 controls. The content itself (a map, a 3D scene, a list, a table, an article) does not count. *House rule:* a data-dense tool (dashboard, editor, admin) may set its own budget in the contract.
+- *House rule:* interface text over budget. At first view, phone screens allow 25 words and 5 controls, desktop screens 40 words and 7 controls. The content itself (a photo, a map, a chart, a list, a table, an article) does not count, and neither do input labels, form instructions or error messages. A data-dense tool (dashboard, editor, admin) sets its own budget in the contract. The script reports the raw counts as `overBudget`; you judge what is content.
 - Instructions cut off by an ellipsis. Instructions wrap; only names and metadata may truncate.
-- Touch targets under 44px, even when the visible mark is smaller. *House rule, stricter than AA:* WCAG 2.5.8 asks for 24px; links inside a sentence are exempt from both.
-- Colour contrast below WCAG 2.2 AA: text under 4.5:1 (3:1 for 24px+, or 18.66px+ bold), and controls, input borders, icons that carry meaning and focus rings under 3:1 against what is next to them. Check both themes and every state (hover, pressed, disabled is exempt but must still read as disabled).
-- Meaning carried by colour alone. Errors, success, the current item, required fields and chart series also differ by text, icon, shape or position, so they survive colour blindness and greyscale.
-- No visible focus. Every control shows a focus ring when reached by keyboard (AA 2.4.7), at 3:1 against what is next to it. *House rule:* make it 2px or more (WCAG 2.4.13, AAA).
+- Targets under 24 by 24px (WCAG 2.5.8, AA). *House rule:* on touch screens, 44px (as WCAG 2.5.5, AAA), even when the visible mark is smaller. A label counts as part of its checkbox; links inside a sentence are exempt.
+- Colour contrast below WCAG 2.2 AA: text under 4.5:1, or 3:1 for 24px+ or 18.66px+ bold (1.4.3); controls, input borders, icons that carry meaning and focus indicators under 3:1 against what is next to them (1.4.11). Check both themes and every state. Disabled controls are exempt but must still read as disabled.
+- Meaning carried by colour alone (1.4.1). Errors, success, the current item, required fields and chart series also differ by text, icon, shape or position, so they survive colour blindness and greyscale.
+- No visible focus. Every control shows a focus indicator when reached by keyboard (2.4.7), at 3:1 against what is next to it (1.4.11), and sticky headers or footers never cover the focused control (2.4.11). *House rule:* a ring of 2px or more (as 2.4.13, AAA).
+- An action that only works by dragging (2.5.7). Give it a tap or click alternative.
 
 ### Reflex: fix, or waive in the contract with one line
 
@@ -76,7 +80,7 @@ The script reads computed styles, not source code. Products with many stylesheet
 - More than 3 radius kinds or 1 shadow kind on a screen. Pill-shaped tags used as decoration.
 - Pure #000 or #fff.
 - Accent colour covering more than 5% of a viewport.
-- Pulsing dots, blinking cursors, auto-scrolling, bounce easing, animated or rolling emoji. Anything that moves for more than 5 seconds needs a pause.
+- Pulsing dots, blinking cursors, auto-scrolling, bounce easing, animated or rolling emoji. Anything that moves for more than 5 seconds needs a pause (WCAG 2.2.2).
 - Monospace used as a costume for labels instead of for code, data or times.
 - A caption that explains the picture next to it.
 - A drawn fake interface where a real screenshot of the product exists.
@@ -88,7 +92,7 @@ The script reads computed styles, not source code. Products with many stylesheet
 - One style each for buttons, quiet text buttons and icon buttons. No fourth.
 - A button does something; a text link with a chevron goes somewhere. Two different kinds of interaction never share a look.
 - Pick icon-only (with an accessible label) for universal symbols such as close, back and sound, and text-only for everything else. Never icon, text and tooltip on one control. *House rule:* a toolbar of many tools may pair icon and text, and say so in the contract.
-- Hide what is used later in the flow (share, settings, info) and reveal it when it becomes useful, where the eye already is.
+- Hide what is used later in the flow (share, export, secondary settings) and reveal it when it becomes useful, where the eye already is. Navigation and help stay in the same place on every screen (WCAG 3.2.3, 3.2.6).
 - While the user is in the main task, chrome sits at the edges and stays small. Nothing floats over the content they are working on.
 
 ### Labels
@@ -105,7 +109,7 @@ The script reads computed styles, not source code. Products with many stylesheet
 
 - Pick the accent and state colours by contrast first, hue second. Where a brand colour fails on the ground, use a darker or lighter step of it for text and keep the original for large fills.
 - Red and green never sit side by side as the only difference between two states. Test the palette with a deuteranopia and protanopia simulation (browser dev tools can emulate both).
-- Text on photos, video, 3D scenes or gradients sits on a scrim that brings it to 4.5:1 at its worst spot. The structural check cannot measure these, so check them by eye at the darkest and lightest frame.
+- Text on photos, video, canvas or gradients sits on a scrim that brings it to 4.5:1 at its worst spot. The structural check cannot measure these, so check them by eye at the darkest and lightest frame.
 - Placeholder text is not a label, and still needs 4.5:1 if it carries information.
 - Respect `prefers-contrast: more` and forced-colours modes: borders that only exist as shadows disappear in forced colours, so give important outlines a real border.
 
@@ -132,26 +136,26 @@ For each screen, list every element and string with its one job, and mark it kee
 1. Run the structural check and the screenshots again. Report the before and after counts per screen: words, controls, font sizes, radii, small text, caps, middle dots, stripes, dividers, nesting, contrast.
 2. Look at every after screenshot yourself. A fix often exposes a new collision, such as a caption that now wraps onto the line above. Fix it in the same pass.
 3. Make a before/after board: the live version beside the new build, at desktop and phone sizes, with one short line per change.
-4. Get a score only from fresh reviewers who have never seen the product. Give them nothing but the URL, one sentence on what the product is, the units, the rubric and the output format. See [references/review-rubric.md](references/review-rubric.md). Never report a score you gave yourself.
+4. A score is optional outside the loop and costs one agent per reviewer: say so and ask before running any. Scores come only from fresh reviewers who have never seen the product, sized to the change as in [references/review-rubric.md](references/review-rubric.md). Never report a score you gave yourself.
 5. **Home gate (new products).** One fresh reviewer looks only at the first screen, on desktop and phone, and answers `ship` or `fix` with at most 5 one-line findings, worst first. Build other pages only after `ship`.
 
 ## Grading loop (only when the user turned it on)
 
-Ask once, together with the loop question: the target (default 8.5), the round limit (default 6), the URL, one sentence on what the product is and who it is for, 3–12 units to score, and the expert for lens 6. Then run without asking again until a stop. Work in `deslop-review/` at the product root, one folder per round.
+Ask once, in the same message as the loop question: the target score (default 8.5), the round limit (default 6), the URL (local or staging), a test account or a Playwright storage-state file if screens sit behind a sign-in, one sentence on what the product is and who it is for, 3–12 units to score, and the expert for lens 6. Then run without asking again until a stop. Work in `deslop-review/` at the product root.
 
-Each round:
+Each round, with `R` the round folder (`deslop-review/round-N`):
 
-1. Check. Run the structural check for each screen into the round folder, naming the units it covers:
-   `node "$SKILL/scripts/structure-check.mjs" URL --units NAV,HERO --out deslop-review/round-N/check-home-desktop.json` (and again with `--phone`). A unit on a screen that fails the Floor is capped at 7.0.
-2. Score. Start 10 new `deslop-juror` agents in parallel, one per lens, each with only: the URL, the product sentence, the units, its lens, the path `$SKILL/references/values.md`, and its output file `deslop-review/round-N/juror-NN.json`. Never resume a juror; never tell one about earlier rounds.
-3. Aggregate. `node "$SKILL/scripts/aggregate.mjs" deslop-review/round-N deslop-review/round-(N-1) --target T --round N --max-rounds M` (leave out the previous folder in round 1). It skips invalid juror files and says why; rerun a juror whose file was skipped.
-4. Brief. Start one `deslop-oracle` agent with the round folder, `$SKILL/references/values.md`, and the path of `DESIGN.md` if there is one. It writes `brief.md`.
+1. Check. Run the structural check for each screen into the round folder, naming the units it covers and passing the contract's waivers:
+   `node "$SKILL/scripts/structure-check.mjs" URL --units NAV,HERO --waive tinyCaps --out R/check-home-desktop.json`, and again with `--phone`. A unit on a screen that fails the Floor is capped at 7.0.
+2. Score. Start 10 new `deslop-juror` agents in parallel, one per lens, each with only: the URL, the test account if any, the product sentence, the units, its lens, the path `$SKILL` (for `values.md` and the scripts), and its output file `R/juror-NN.json`. Never resume a juror; never tell one about earlier rounds. If the `deslop-juror` agent type is not installed, start a general-purpose agent with the body of `$SKILL/agents/deslop-juror.md` as its instructions; the same for the Oracle.
+3. Aggregate. `node "$SKILL/scripts/aggregate.mjs" R deslop-review/round-(N-1) --target T --round N --max-rounds M` (leave out the previous folder in round 1). It skips invalid units and failed jurors and says why. Rerun each skipped juror once, as a new agent; if it fails again, go on with the rest, as long as at least 5 jurors scored every unit.
+4. Brief. Start one `deslop-oracle` agent with the round folder, `$SKILL/references/values.md`, and the path of `DESIGN.md` if there is one. It writes `R/brief.md`.
 5. Decide, from `decision` in `summary.json`:
-   - `continue`: apply the brief with steps 4–5 of this method, revert any unit listed in `regressions`, then start the next round.
+   - `continue`: revert the last change to any unit in `regressions`, apply the fixes in `brief.md` and nothing else (following step 5's build rules), then start the next round.
    - `target-reached` or `max-rounds`: stop and report the scores.
-   - `plateau`: stop and show the user the Oracle's 2–3 bolder directions. The loop restarts only from the one they pick.
+   - `plateau`: stop and show the user the Oracle's 2–3 bolder directions. If they pick one, build it and start a new series in `deslop-review/direction-2/round-1` (round numbers, the round limit and the plateau count start again; round 1 of the series has no previous folder).
 
-Report only aggregated juror scores. The full protocol, lenses and file layout are in [references/grading-loop.md](references/grading-loop.md); the agent definitions are in `agents/` and must be installed as Claude Code subagents (see the README).
+Report only aggregated juror scores; never score your own work. The full protocol, lenses and file layout are in [references/grading-loop.md](references/grading-loop.md); the agent definitions are in `agents/`.
 
 ## Video and motion
 
