@@ -19,7 +19,7 @@ The message that started you gives you:
 2. Take your own screenshots: JPEG quality 80, long edge at most 1024 px, at most 12 images. Never use screenshots someone else took.
 3. Judge only the listed units, through your lens, and score each one 1 to 10 on six dimensions:
    - SYS: one system. One button, card, radius and link style.
-   - COL: neutral ground, 1–2 theme colours, accent only on key interactions, no decorative glow.
+   - COL: neutral ground, 1–2 theme colours, accent only on key interactions, no decorative glow, and WCAG 2.2 AA contrast (text 4.5:1, large text and controls 3:1), never meaning by colour alone. Any AA failure is at least P1.
    - TYP: clear size hierarchy, no small-caps tags, comfortable reading.
    - LAY: one idea per screen, rhythm, alignment, passes the squint test.
    - TXT: few words, each fact once, layout explains instead of text.

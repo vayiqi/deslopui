@@ -8,6 +8,8 @@ Save as `DESIGN.md` at the product root and mirror it as CSS custom properties o
 |---|---|---|
 | ground / surface | 2–3 | Near-neutral, tinted slightly toward the brand hue. Never pure #000 or #fff. In dark mode a surface is one step lighter than the ground. |
 | ink / muted | 2 | Body text at 7:1 or more. Muted only for labels, dates and metadata, at 4.5:1 or more. |
+
+Write the measured contrast next to every text and control colour, on every ground it is used on, in both themes. AA minimums (WCAG 2.2): text 4.5:1, large text 3:1, controls, meaningful icons and focus rings 3:1. A pair that fails is not in the contract. State colours are paired with an icon or a word, never colour alone, and checked under colour-blindness simulation.
 | brand | 1, at most 2 | Identity. |
 | accent | 1 | Only the primary action, focus ring and current state. At most 5% of any viewport. |
 | state | up to 3 | Success, warning, error. Only for state. |

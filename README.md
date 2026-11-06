@@ -7,10 +7,11 @@ It covers:
 - **A design contract** written before any screen: colour tokens with one job each, one type ramp, three radii, one shadow, motion rules, waivers with reasons.
 - **Structural rules**: no control inside a control, no chip inside a chip, no box inside a box past two levels, no one-side colour stripes, no decorative dividers, no fact said twice, no stacked feature blocks.
 - **Floor and reflex checks** for type, copy, colour, motion and touch targets.
+- **Accessible colour**: WCAG 2.2 AA contrast for text (4.5:1, large 3:1), controls, icons and focus rings (3:1), no meaning by colour alone, colour-blind and forced-colours checks, scrims for text over images.
 - **A build order** for new products: key visual, then the home page, then a fresh-reviewer ship/fix gate, then everything else.
 - **A review rubric** for fresh, no-context reviewers, with six sub-scores (system, colour, type, layout, text, specificity) and P0–P3 severity.
 - **Video rules** for product films: explain with the frame, not with captions.
-- **A structural check script** that reads computed styles in a real browser and counts the patterns above.
+- **A structural check script** that reads computed styles in a real browser and counts the patterns above, including text that fails AA contrast.
 - **An optional grading loop**: each round, 10 blind expert jurors score every unit on six dimensions from 1 to 10, a script averages them, an Oracle turns their fixes into one ranked brief, and the build repeats until the score you set or a plateau. The skill asks before turning it on.
 
 ## Install
@@ -74,6 +75,8 @@ smallText         1
 tinyCaps          0
 middleDots        0
 smallTargets      5
+lowContrast       0
+contrastUnknown   3 (text over images, gradients or canvas: check those by eye)
 ```
 
 The JSON lists every hit with its element and text, so you can find it in the code. The script finds candidates; the skill decides. A segmented control's thumb or a waived brand element can be fine.

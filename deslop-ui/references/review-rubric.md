@@ -24,7 +24,8 @@ Take your own screenshots: JPEG q80, long edge <= 1024 px, at most {N}.
 Judge only these units: {unit list, one line each}.
 Score each unit 0-10 on six parts:
   SYS  one system: one button, card, radius and link style
-  COL  neutral ground, 1-2 theme colours, accent only on key interactions, no decorative glow
+  COL  neutral ground, 1-2 theme colours, accent only on key interactions, no decorative glow,
+       WCAG 2.2 AA contrast, never meaning by colour alone
   TYP  clear size hierarchy, no small-caps tags, comfortable reading
   LAY  one idea per screen, rhythm, alignment, passes the squint test
   TXT  few words, each fact once, layout explains instead of text

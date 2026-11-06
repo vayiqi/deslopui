@@ -35,7 +35,14 @@ export const check = () => {
     const sides = ['Top', 'Right', 'Bottom', 'Left'].filter(k => parseFloat(s['border' + k + 'Width']) > 0 && s['border' + k + 'Style'] !== 'none');
     const sh = s.boxShadow !== 'none', rad = parseFloat(s.borderRadius) || 0;
     return { framed: (bg && (rad > 0 || sh)) || sides.length === 4 || sh, sides, rad, w: r.width, h: r.height, bg }; };
-  const out = { words: 0, controls: 0, fontSizes: [], radii: [], controlInControl: [], boxInBox: [], pillInPill: [], sideStripes: [], dividers: [], smallText: [], tinyCaps: [], middleDots: [], smallTargets: [] };
+  const rgba = c => { const m = c.match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 }; };
+  const lum = ({ r, g, b }) => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const blend = (top, base) => ({ r: top.r * top.a + base.r * (1 - top.a), g: top.g * top.a + base.g * (1 - top.a), b: top.b * top.a + base.b * (1 - top.a), a: 1 });
+  // effective background: walk up and blend; null when an image, gradient or canvas sits behind the text
+  const backdrop = e => { const layers = []; for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (s.backgroundImage !== 'none' || p.tagName === 'CANVAS' || p.tagName === 'VIDEO') return null; const c = rgba(s.backgroundColor); if (c && c.a > 0) { layers.push(c); if (c.a >= 1) break; } }
+    let base = { r: 255, g: 255, b: 255, a: 1 }; for (const c of layers.reverse()) base = blend(c, base); return base; };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const out = { words: 0, controls: 0, fontSizes: [], radii: [], controlInControl: [], boxInBox: [], pillInPill: [], sideStripes: [], dividers: [], smallText: [], tinyCaps: [], middleDots: [], smallTargets: [], lowContrast: [], contrastUnknown: 0 };
   const sizes = new Set(), radii = new Set();
   for (const e of [...document.querySelectorAll('body *')].filter(vis)) {
     const s = getComputedStyle(e), f = frame(e);
@@ -62,6 +69,10 @@ export const check = () => {
     if (px < 13) out.smallText.push(`${own.slice(0, 30)} @${px}px`);
     if ((s.textTransform === 'uppercase' || s.fontVariantCaps.includes('small') || ls / px > 0.03) && px <= 15 && /[a-z]/i.test(own)) out.tinyCaps.push(`${own.slice(0, 30)} @${px}px`);
     if (/ · /.test(own)) out.middleDots.push(own.slice(0, 50));
+    { const fg = rgba(s.color), bg = backdrop(e);
+      if (!fg || !bg) out.contrastUnknown++;
+      else { const cr = ratio(blend(fg, bg), bg), large = px >= 24 || (px >= 18.66 && +s.fontWeight >= 700), need = large ? 3 : 4.5;
+        if (cr < need) out.lowContrast.push(`${cr.toFixed(2)}:1 (needs ${need}) "${own.slice(0, 30)}" @${px}px`); } }
   }
   out.fontSizes = [...sizes].sort((a, b) => a - b);
   out.radii = [...radii];
@@ -85,5 +96,6 @@ const json = JSON.stringify(result, null, 2);
 if (opt('--out')) writeFileSync(opt('--out'), json);
 const n = k => (Array.isArray(result[k]) ? result[k].length : result[k]);
 console.log(`${result.device}  words ${result.words}  controls ${result.controls}  font sizes ${result.fontSizes.length}  radii ${result.radii.length}`);
-for (const k of ['controlInControl', 'pillInPill', 'boxInBox', 'sideStripes', 'dividers', 'smallText', 'tinyCaps', 'middleDots', 'smallTargets']) console.log(`${k.padEnd(17)} ${n(k)}`);
+for (const k of ['controlInControl', 'pillInPill', 'boxInBox', 'sideStripes', 'dividers', 'smallText', 'tinyCaps', 'middleDots', 'smallTargets', 'lowContrast']) console.log(`${k.padEnd(17)} ${n(k)}`);
+console.log(`contrastUnknown   ${result.contrastUnknown} (text over images, gradients or canvas: check those by eye)`);
 if (!opt('--out')) console.log(json);

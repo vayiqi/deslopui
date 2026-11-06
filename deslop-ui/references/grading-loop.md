@@ -52,7 +52,7 @@ The loop is opt-in. Before every run, ask the user whether to turn it on, and sa
 | Key | Dimension |
 |---|---|
 | SYS | One system: one button, card, radius and link style |
-| COL | Neutral ground, 1–2 theme colours, accent only on key interactions, no decorative glow |
+| COL | Neutral ground, 1–2 theme colours, accent only on key interactions, no decorative glow, WCAG AA contrast, never meaning by colour alone |
 | TYP | Clear size hierarchy, no small-caps tags, comfortable reading |
 | LAY | One idea per screen, rhythm, alignment, passes the squint test |
 | TXT | Few words, each fact once, layout explains instead of text |

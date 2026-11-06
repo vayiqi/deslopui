@@ -58,6 +58,9 @@ The script reads computed styles, not source code. Products with many stylesheet
 - Interface text over budget. At first view, phone screens allow 25 words and 5 controls, desktop screens 40 words and 7 controls. The content itself (a map, a 3D scene, a list) does not count.
 - Instructions cut off by an ellipsis. Instructions wrap; only names and metadata may truncate.
 - Touch targets under 44px, even when the visible mark is smaller.
+- Colour contrast below WCAG 2.2 AA: text under 4.5:1 (3:1 for 24px+, or 18.66px+ bold), and controls, input borders, icons that carry meaning and focus rings under 3:1 against what is next to them. Check both themes and every state (hover, pressed, disabled is exempt but must still read as disabled).
+- Meaning carried by colour alone. Errors, success, the current item, required fields and chart series also differ by text, icon, shape or position, so they survive colour blindness and greyscale.
+- No visible focus. Every control shows a focus ring of 2px or more at 3:1 contrast when reached by keyboard.
 
 ### Reflex: fix, or waive in the contract with one line
 
@@ -90,6 +93,14 @@ The script reads computed styles, not source code. Products with many stylesheet
 - One term per concept across the product. Keep a word list.
 - Each language mode is complete on its own and uses its own punctuation.
 - Remove a word. If the meaning does not change, leave it out. Repeat.
+
+### Accessible colour
+
+- Pick the accent and state colours by contrast first, hue second. Where a brand colour fails on the ground, use a darker or lighter step of it for text and keep the original for large fills.
+- Red and green never sit side by side as the only difference between two states. Test the palette with a deuteranopia and protanopia simulation (browser dev tools can emulate both).
+- Text on photos, video, 3D scenes or gradients sits on a scrim that brings it to 4.5:1 at its worst spot. The structural check cannot measure these, so check them by eye at the darkest and lightest frame.
+- Placeholder text is not a label, and still needs 4.5:1 if it carries information.
+- Respect `prefers-contrast: more` and forced-colours modes: borders that only exist as shadows disappear in forced colours, so give important outlines a real border.
 
 ### Dark surfaces
 
