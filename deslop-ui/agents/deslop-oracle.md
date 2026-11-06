@@ -16,7 +16,7 @@ The message that started you gives you the round folder. It contains `summary.js
    1. P0, then P1.
    2. More jurors before fewer.
    3. Fixes that lift a unit's lowest dimension before others.
-4. Drop a fix when it breaks the design contract, adds explanatory text, tooltips or features, or contradicts a fix ranked above it. List what you dropped and why in one line each.
+4. Prefer fixes that serve more than one value in `references/values.md`; when two fixes conflict, the lower-numbered value wins, and V11 (made for everyone) is never traded away. Drop a fix when it breaks the design contract, adds explanatory text, tooltips or features, or contradicts a fix ranked above it. List what you dropped and why in one line each.
 5. Where a dimension's spread is above 3, say so next to the fix: jurors disagree, so the builder should make the smallest change that satisfies the majority.
 6. If the decision is `continue`, write at most 8 fixes. If it is `plateau`, write no fixes. Instead, write 2–3 bolder directions: what would change, which units it lifts, and the risk of each.
 

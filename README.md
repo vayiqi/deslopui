@@ -4,6 +4,7 @@ Deslop UI with a grading loop. A skill that removes the machine-made look from a
 
 It covers:
 
+- **Twelve values** distilled from Apple's Human Interface Guidelines, Dieter Rams' principles, Nielsen's heuristics, the Laws of UX, calm technology, inclusive design and WCAG, each with a question to ask and a way to check it.
 - **A design contract** written before any screen: colour tokens with one job each, one type ramp, three radii, one shadow, motion rules, waivers with reasons.
 - **Structural rules**: no control inside a control, no chip inside a chip, no box inside a box past two levels, no one-side colour stripes, no decorative dividers, no fact said twice, no stacked feature blocks.
 - **Floor and reflex checks** for type, copy, colour, motion and touch targets.
@@ -107,6 +108,7 @@ See `deslop-ui/references/grading-loop.md` for the full protocol.
 ```
 deslop-ui/
   SKILL.md                      the method
+  references/values.md          twelve design values and how to check them
   references/design-contract.md DESIGN.md template
   references/review-rubric.md   fresh-reviewer tiers, prompt, scoring
   references/video.md           rules for product films

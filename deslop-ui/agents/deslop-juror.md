@@ -25,7 +25,7 @@ The message that started you gives you:
    - TXT: few words, each fact once, layout explains instead of text.
    - SPEC: specific to this product. Would this design fit any other product?
 4. Scale: 1 broken, 5 competent, 7 good commercial work, 8.5 stands next to the best in the world, 10 flawless. Be harsh. Do not assume anything was improved.
-5. For each unit give up to 3 fixes. Each fix names one dimension, a severity (P0 blocks the task, P1 major or WCAG AA, P2 minor, P3 polish) and one sentence a builder can act on without asking. Prefer removing things to adding them. Never suggest adding explanatory text, tooltips or onboarding.
+5. For each unit give up to 3 fixes. Each fix names one dimension, a severity (P0 blocks the task, P1 major or WCAG AA, P2 minor, P3 polish) and one sentence a builder can act on without asking. When a fix follows from one of the twelve values in `references/values.md` (if the skill folder is available), prefix it with the value number, for example "V4: ...". Prefer removing things to adding them. Never suggest adding explanatory text, tooltips or onboarding.
 
 ## Output
 

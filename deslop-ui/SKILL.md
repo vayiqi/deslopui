@@ -9,6 +9,8 @@ The job is subtraction. A pass is judged by what it removes while a stranger sti
 
 **Before you start, ask the user one question: run the grading loop or not?** The loop adds 10 blind expert jurors and an Oracle each round and repeats until a target score or a plateau, so it costs many times a single pass. If yes, also ask for the target score (default 8.5) and the round limit (default 6). If no, do a single pass and stop after step 6. Ask every time; never turn the loop on by default.
 
+The rules below come from twelve values, distilled from Apple's Human Interface Guidelines, Dieter Rams, Nielsen's heuristics, the Laws of UX, calm technology and inclusive design. When a rule does not cover a case, decide by [references/values.md](references/values.md).
+
 Two entry points:
 
 - **Existing product**: follow steps 1 to 6.
