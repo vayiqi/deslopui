@@ -50,7 +50,7 @@ The script reads computed styles, not source code. Products with many stylesheet
 | Pattern | Rule |
 |---|---|
 | Control inside a control | One tap target per region. A card that opens something has no separate "Open" button. |
-| Chip inside a chip, pill inside a pill | A bar of buttons is one frame with no inner dividers. A segmented control shows its state with a thumb, not a dark chip inside a pale track; the selected thumb still differs from the track at 3:1 or by weight (WCAG 1.4.11). |
+| Chip inside a chip, pill inside a pill | A bar of buttons is one frame with no inner dividers. A segmented control shows its state with a thumb, not a dark chip inside a pale track; the selected state differs by more than colour, such as weight or an outline (1.4.1), and the thumb's edge reaches 3:1 against the track (1.4.11). |
 | Card inside a card | A framed block never sits inside another framed block. Controls and chips inside a card are fine. Content can sit directly on the page. |
 | One-side colour stripe | No coloured edge on the current row, a warning or a card. Show state once, with a cue that is not only colour: weight, an icon, a word, or a fill plus a visible marker (WCAG 1.4.1). |
 | Divider rules | Only between different kinds of content. Never inside a row of icons or numbers; use space. |
@@ -78,9 +78,9 @@ The script reads computed styles, not source code. Products with many stylesheet
 - Metadata joined by middle dots ("Report · 3 pages · Edited today"). Use commas, a sentence, or space between groups.
 - Glow, halo, radial spotlight, coloured zero-offset shadow, gradient text, purple-to-blue or cyan-on-dark gradients.
 - More than 3 radius kinds or 1 shadow kind on a screen. Pill-shaped tags used as decoration.
-- Pure #000 or #fff.
+- *House rule:* pure #000 or #fff as the ground or body text. A high-contrast theme may use them.
 - Accent colour covering more than 5% of a viewport.
-- Pulsing dots, blinking cursors, auto-scrolling, bounce easing, animated or rolling emoji. Anything that moves for more than 5 seconds needs a pause (WCAG 2.2.2).
+- Pulsing dots, blinking cursors, auto-scrolling, bounce easing, animated or rolling emoji. Motion that starts on its own and runs for more than 5 seconds next to other content can be paused, stopped or hidden (WCAG 2.2.2).
 - Monospace used as a costume for labels instead of for code, data or times.
 - A caption that explains the picture next to it.
 - A drawn fake interface where a real screenshot of the product exists.
@@ -115,7 +115,7 @@ The script reads computed styles, not source code. Products with many stylesheet
 
 ### Dark surfaces
 
-In dark mode a raised surface is one step lighter than the ground. Use no shadows; separate with a lighter surface or a 1px inset line. Keep muted text at 4.5:1 or more (AA). *House rule:* body text at 7:1 (AAA), in both themes. Never invert the light palette mechanically.
+In dark mode a raised surface is one step lighter than the ground. Use no shadows; separate with a lighter surface or a 1px border (a real border, so it survives forced colours). Keep muted text at 4.5:1 or more (AA). *House rule:* body text at 7:1 (AAA), in both themes. Never invert the light palette mechanically.
 
 ### Generated and decorative graphics
 
@@ -151,7 +151,7 @@ Each round, with `R` the round folder (`deslop-review/round-N`):
 3. Aggregate. `node "$SKILL/scripts/aggregate.mjs" R deslop-review/round-(N-1) --units NAV,HERO,... --target T --round N --max-rounds M` (leave out the previous folder in round 1). It skips unit names that are not in `--units`, invalid scores and failed jurors, and says why. Rerun each skipped juror once, as a new agent. A unit needs scores from at least half the jurors, and at least 3; until then the decision is never `target-reached`, and `thin` lists the unit.
 4. Brief. Start one `deslop-oracle` agent with the round folder, `$SKILL/references/values.md`, and the path of `DESIGN.md` if there is one. It writes `R/brief.md`.
 5. Decide, from `decision` in `summary.json`:
-   - `continue`: revert the last change to any unit in `regressions`, apply the fixes in `brief.md` and nothing else (following step 5's build rules), then start the next round.
+   - `continue`: revert the last change to any unit in `regressions`, apply the fixes in `brief.md` and nothing else (following section 5, Build it so it sticks), then start the next round.
    - `target-reached` or `max-rounds`: stop and report the scores.
    - `plateau`: stop and show the user the Oracle's 2–3 bolder directions. If they pick one, build it and start a new series in `deslop-review/direction-K/round-1`, with K = 2 for the first plateau, 3 for the next. Round numbers, the round limit and the plateau count start again; round 1 of a series has no previous folder.
 

@@ -83,7 +83,7 @@ People can undo, go back and leave without penalty. Mistakes are prevented by de
 Important targets are large and near where the hand or pointer already is. Small, distant or crowded targets are reserved for rare actions.
 
 - Ask: on a phone held in one hand, can I reach the main action with my thumb?
-- Check: targets at least 24 by 24 px (WCAG 2.5.8); house rule 44 by 44 px on touch screens with 8 px between adjacent targets; the primary action sits in the reachable zone on phones.
+- Check: targets at least 24 by 24 px (WCAG 2.5.8); house rule 44 by 44 px on touch screens; the primary action sits in the reachable zone on phones.
 
 ## 10. Honest
 

@@ -38,7 +38,6 @@ The default first-view budgets are 25 words and 5 controls on phone, 40 words an
 
 ## 6. Waivers
 
-
 One line each: the rule it breaks, the reason, where it applies. Example: "Uppercase 13px table headers: matches the exported CSV, data tables only." A waiver without a reason is rejected. A rule waived three times becomes part of the contract. Only house rules can be waived, never WCAG AA. Pass the waived checks to the script: `--waive touchTargets,smallText,tinyCaps`.
 
 ## 7. References

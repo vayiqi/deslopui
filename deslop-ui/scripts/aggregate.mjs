@@ -55,7 +55,7 @@ export function aggregate(jurors, { prev = null, checks = [], target = 8.5, roun
       dims[d] = { mean: r1(trimmed(xs)), median: median(xs), spread: Math.max(...xs) - Math.min(...xs), n: xs.length };
     }
     const raw = unitScore(Object.fromEntries(DIMS.map(d => [d, dims[d].mean])));
-    const floorFails = checks.filter(c => c.floor?.length && (!c.units || c.units.includes(name)))
+    const floorFails = checks.filter(c => c.floor?.length && (!c.units || c.units.some(x => x.toLowerCase() === name.toLowerCase())))
       .map(c => `${c.file}: ${c.floor.join(', ')}`);
     const score = r1(floorFails.length ? Math.min(raw, FLOOR_CAP) : raw);
     const lowest = DIMS.slice().sort((a, b) => dims[a].mean - dims[b].mean)[0];
@@ -84,9 +84,11 @@ export function aggregate(jurors, { prev = null, checks = [], target = 8.5, roun
   const flat = delta !== null && Math.abs(delta) <= plateauBand;
 
   let decision = 'continue';
+  // A unit held at the Floor cap is not a plateau: clearing the Floor is the next fix.
+  const floorHeld = units.some(u => u.capped);
   if (!thin.length && units.every(u => u.score >= target)) decision = 'target-reached';
-  else if (flat && prevFlat) decision = 'plateau';
   else if (round && round >= maxRounds) decision = 'max-rounds';
+  else if (flat && prevFlat && !floorHeld) decision = 'plateau';
 
   return { round, jurors: jurors.length, minJurors, thin, target, maxRounds, overall, delta, plateauBand, decision, regressions,
     units: units.sort((a, b) => (a.score ?? -1) - (b.score ?? -1)) };
@@ -113,7 +115,7 @@ export function loadRound(dir, expected = null) {
 
 function main() {
   const args = process.argv.slice(2);
-  const usage = 'Usage: node aggregate.mjs <round-dir> [previous-round-dir] [--target 8.5] [--round N] [--max-rounds 6]';
+  const usage = 'Usage: node aggregate.mjs <round-dir> [previous-round-dir] [--units A,B] [--target 8.5] [--round N] [--max-rounds 6]';
   const flags = {}, pos = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '-h' || args[i] === '--help') { console.log(usage); return; }
@@ -124,6 +126,8 @@ function main() {
       if (!['--target', '--round', '--max-rounds', '--units'].includes(k)) { console.error(`Unknown option ${k}\n${usage}`); process.exit(1); }
       if (k === '--units') { if (!raw || raw.startsWith('--')) { console.error(`--units needs a list\n${usage}`); process.exit(1); } flags[k] = raw.split(',').map(x => x.trim()).filter(Boolean); continue; }
       if (raw === undefined || raw === '' || !Number.isFinite(v)) { console.error(`${k} needs a number\n${usage}`); process.exit(1); }
+      if (k === '--target' && (v < 1 || v > 10)) { console.error('--target must be between 1 and 10'); process.exit(1); }
+      if (k !== '--target' && (v < 1 || !Number.isInteger(v))) { console.error(`${k} must be a whole number of 1 or more`); process.exit(1); }
       flags[k] = v;
     } else pos.push(args[i]);
   }
@@ -150,7 +154,7 @@ function main() {
 
   const d = summary.delta;
   console.log(`round ${summary.round ?? '?'}  jurors ${summary.jurors}  overall ${summary.overall}${d !== null ? ` (${d >= 0 ? '+' : ''}${d}; moves within ±${summary.plateauBand} are noise)` : ''}  target ${summary.target}  decision ${summary.decision}`);
-  for (const u of summary.units) console.log(`${u.u.padEnd(10)} ${u.score === null ? '   –' : u.score.toFixed(1).padStart(4)}  jurors ${u.jurors}  lowest ${u.lowest}${u.capped ? '  floor-capped' : u.floor.length ? '  floor-fails' : ''}${u.disputed.length ? `  disputed ${u.disputed.join(',')}` : ''}  fixes ${u.fixes.length}`);
+  for (const u of summary.units) console.log(`${u.u.padEnd(10)} ${u.score === null ? '   –' : u.score.toFixed(1).padStart(4)}  jurors ${u.jurors}${u.lowest ? `  lowest ${u.lowest}` : ''}${u.capped ? '  floor-capped' : u.floor.length ? '  floor-fails' : ''}${u.disputed.length ? `  disputed ${u.disputed.join(',')}` : ''}  fixes ${u.fixes.length}`);
   if (summary.regressions.length) console.log(`regressions: ${summary.regressions.join(', ')}`);
   if (summary.thin.length) console.log(`too few jurors (under ${summary.minJurors}): ${summary.thin.join(', ')}; rerun jurors before trusting these`);
 }

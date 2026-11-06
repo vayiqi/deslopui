@@ -133,3 +133,15 @@ test('round number is read only from round-N folder names', () => {
   assert.equal(spawnSync(process.execPath, [script, dir]).status, 0);
   assert.equal(JSON.parse(readFileSync(join(dir, 'summary.json'), 'utf8')).round, null);
 });
+
+test('a unit held at the Floor cap is never a plateau, and the round limit wins over a plateau', () => {
+  const j = v => [1, 2, 3, 4, 5].map(i => juror(`j${i}`, [['NAV', v]]));
+  const checks = [{ file: 'check-phone.json', floor: ['lowContrast'], units: ['nav'] }];
+  const r1 = aggregate(j(9), { round: 1, checks });
+  assert.equal(r1.units[0].score, 7, 'check units match case-insensitively');
+  const r2 = aggregate(j(9), { round: 2, prev: r1, checks });
+  const r3 = aggregate(j(9), { round: 3, prev: r2, checks });
+  assert.equal(r3.decision, 'continue');
+  const f1 = aggregate(j(7), { round: 1 }), f2 = aggregate(j(7), { round: 2, prev: f1 });
+  assert.equal(aggregate(j(7), { round: 3, prev: f2, maxRounds: 3 }).decision, 'max-rounds');
+});

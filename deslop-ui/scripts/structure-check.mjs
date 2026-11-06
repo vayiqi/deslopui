@@ -159,13 +159,17 @@ export const check = ({ touch = false } = {}) => {
     return { bg: flat(b), fg: flat(over(fade(pm(fg), opacity(e)), b)) }; };
   const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
   // WCAG 2.5.8 exempts a link inside a sentence: an inline link whose parent has text of its own.
-  const inlineLink = e => e.tagName === 'A' && getComputedStyle(e).display === 'inline' && [...(e.parentElement?.childNodes || [])].some(n => n.nodeType === 3 && n.textContent.trim());
+  const inlineLink = e => { if (e.tagName !== 'A' || getComputedStyle(e).display !== 'inline') return false;
+    let p = e.parentElement; while (p && getComputedStyle(p).display === 'inline') p = p.parentElement;
+    return !!p && (p.textContent || '').trim().length > (e.textContent || '').trim().length; };
   // The hit area of a checkbox or radio includes its label.
   const hitBox = e => { const r = e.getBoundingClientRect(); let { left, top, right, bottom } = r;
     for (const l of [...(e.labels || [])]) { const q = l.getBoundingClientRect(); if (q.width * q.height > (right - left) * (bottom - top)) ({ left, top, right, bottom } = q); }
     return { left, top, right, bottom, w: right - left, h: bottom - top }; };
   // WCAG 2.5.8 exempts controls the browser draws unstyled, such as a native checkbox.
-  const native = e => e.matches('input[type=checkbox],input[type=radio],input[type=range],input[type=color],input[type=file],select') && getComputedStyle(e).appearance !== 'none';
+  // Only while the author has not resized it: style width and height stay auto.
+  const native = e => e.matches('input[type=checkbox],input[type=radio],input[type=range],input[type=color],input[type=file],select') && getComputedStyle(e).appearance !== 'none'
+    && !e.style.width && !e.style.height && e.getBoundingClientRect().width <= 20;
   const targets = [];
 
   const hits = { controlInControl: [], boxInBox: [], pillInPill: [], sideStripes: [], dividers: [], smallText: [], tinyCaps: [], middleDots: [], smallTargets: [], touchTargets: [], lowContrast: [] };
@@ -207,7 +211,7 @@ export const check = ({ touch = false } = {}) => {
     if (!pt) out.contrastUnknown++;
     else { const cr = ratio(pt.fg, pt.bg);
       // Large text (WCAG): 18pt (24px), or 14pt (18.667px) at weight 700 or more.
-      const large = px >= 24 || (px >= 18.6 && +s.fontWeight >= 700), need = large ? 3 : 4.5;
+      const large = px >= 24 || (px >= 18.66 && +s.fontWeight >= 700), need = large ? 3 : 4.5;
       if (cr < need) hits.lowContrast.push(`${(Math.floor(cr * 100) / 100).toFixed(2)}:1 (needs ${need}) "${own.slice(0, 30)}" @${px}px`); }
   }
   // 2.5.8: an undersized target passes if a 24px circle on its centre touches no other target and no other such circle.
@@ -220,7 +224,7 @@ export const check = ({ touch = false } = {}) => {
       (distToBox(c, o) < 12 || (small.includes(o) && Math.hypot(c[0] - centre(o)[0], c[1] - centre(o)[1]) < 24)));
     if (crowded) hits.smallTargets.push(`${nm(t.e)} ${Math.round(t.w)}x${Math.round(t.h)} "${tx(t.e)}"`);
   }
-  if (touch) for (const t of targets) if ((t.w < 44 || t.h < 44) && !native(t.e)) hits.touchTargets.push(`${nm(t.e)} ${Math.round(t.w)}x${Math.round(t.h)} "${tx(t.e)}"`);
+  if (touch) for (const t of targets) if (t.w < 44 || t.h < 44) hits.touchTargets.push(`${nm(t.e)} ${Math.round(t.w)}x${Math.round(t.h)} "${tx(t.e)}"`);
   out.fontSizes = [...sizes].sort((a, b) => a - b);
   out.radii = [...radii];
   // Keep one line per distinct hit, with how many times it occurs; counts are totals.
