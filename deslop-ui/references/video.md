@@ -7,5 +7,5 @@ Product films carry the same slop as product screens. Small captions are the com
 - **One type style for the whole film**, taken from the product's design contract. Text sits on a scrim dark enough to read, never on a busy background.
 - **Nothing overlaps.** No text over text, no UI element over another, no clipped glyphs.
 - **Sharp, real footage.** Capture the real product at full resolution. No blurry upscales, no drawn fake UI.
-- **Pace for reading.** Hold any text at least long enough to read twice. Prefer one continuous take to many cuts; no jitter, flashes or frozen frames.
+- **Pace for reading.** Hold any text at least long enough to read twice. Prefer one continuous take to many cuts; no jitter or frozen frames. Nothing flashes more than three times a second (WCAG 2.3.1), and motion that plays on its own for more than 5 seconds can be paused (2.2.2).
 - **Approve before rendering.** Copy and keyframes are approved before the final render.

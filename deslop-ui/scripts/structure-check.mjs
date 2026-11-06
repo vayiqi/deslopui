@@ -3,32 +3,31 @@
 // Needs Node 20+ and Playwright with a Chromium build: npm i -D playwright && npx playwright install chromium
 // Exit codes: 0 Floor passes, 2 Floor fails, 1 the check could not run.
 
-import { writeFileSync, mkdirSync, realpathSync, existsSync } from 'node:fs';
+import { writeFileSync, mkdirSync, realpathSync, existsSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import { join, resolve, dirname, extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const USAGE = `Usage: node structure-check.mjs <url or file> [options]
-  --phone               iPhone 390x844 (touch targets 44px) instead of desktop 1280x800 (24px)
+  --phone               iPhone 390x844 instead of desktop 1280x800; adds the 44px touch-target house rule
   --dark                emulate prefers-color-scheme: dark
   --wait ms             wait after load and after each click (default 3000)
   --click "selector"    click before measuring; repeat for several steps
   --storage-state f     Playwright storage state (cookies, local storage) for pages behind a sign-in
   --units A,B           the scored units on this screen, for the grading loop
-  --waive k1,k2         house rules the design contract waives: ${'tinyCaps, smallText'}
+  --waive k1,k2         house rules the design contract waives: touchTargets, smallText, tinyCaps
   --out file.json       save the full result
   --shot file.jpg|png   save a screenshot of the measured state
   --json                print the JSON result instead of the table`;
 
 // Rules the script can measure without judgement. Any hit blocks shipping (the Floor in SKILL.md).
-export const FLOOR_KEYS = ['controlInControl', 'lowContrast', 'smallTargets', 'smallText', 'tinyCaps'];
+export const FLOOR_KEYS = ['controlInControl', 'lowContrast', 'smallTargets', 'touchTargets', 'smallText', 'tinyCaps'];
 // House rules, stricter than WCAG AA, that a design contract may waive. AA rules can never be waived.
-export const WAIVABLE = ['smallText', 'tinyCaps'];
+export const WAIVABLE = ['touchTargets', 'smallText', 'tinyCaps'];
 // First-view budgets from SKILL.md. Reported, not Floor: the script cannot tell interface text from content.
 export const BUDGET = { phone: { words: 25, controls: 5 }, desktop: { words: 40, controls: 7 } };
-// Smallest target: 44px on touch (house rule, WCAG 2.5.5 AAA), 24px with a pointer (WCAG 2.5.8 AA).
-export const MIN_TARGET = { phone: 44, desktop: 24 };
+// smallTargets: WCAG 2.5.8 (AA), 24px or spaced so 24px circles do not touch. touchTargets: house rule, 44px on phone (as 2.5.5, AAA).
 
 export function parseArgs(argv) {
   const takes = new Set(['--wait', '--click', '--out', '--shot', '--units', '--waive', '--storage-state']);
@@ -65,7 +64,8 @@ export function parseArgs(argv) {
   if (o.help) return o;
   if (!o.url) throw new Error('Give a URL or an HTML file to check');
   if (!/^[a-z]+:\/\//i.test(o.url)) {
-    if (existsSync(o.url)) o.url = pathToFileURL(resolve(o.url)).href;
+    if (existsSync(o.url) && statSync(o.url).isFile()) o.url = pathToFileURL(resolve(o.url)).href;
+    else if (existsSync(o.url)) throw new Error(`${o.url} is a folder; give the HTML file inside it, or serve it and pass the URL`);
     else throw new Error(`Not a URL and no such file: ${o.url}. URLs start with http://, https:// or file://`);
   }
   if (!/^(https?|file):\/\//i.test(o.url)) throw new Error(`URL must start with http://, https:// or file:// (got ${o.url})`);
@@ -83,7 +83,7 @@ export async function loadPlaywright() {
 }
 
 // Runs inside the page. Must be self-contained: Playwright serialises it.
-export const check = ({ minTarget = 44 } = {}) => {
+export const check = ({ touch = false } = {}) => {
   // Any CSS colour (rgb, hex, oklch, lab, color-mix...) to sRGB through a 1x1 canvas.
   const cv = document.createElement('canvas'); cv.width = cv.height = 1;
   const cx = cv.getContext('2d', { willReadFrequently: true }), cache = new Map();
@@ -103,8 +103,9 @@ export const check = ({ minTarget = 44 } = {}) => {
       if (/inset\(50%\)|circle\(0/.test(s.clipPath)) return true;
       if (r.width <= 1 && r.height <= 1 && s.overflow === 'hidden') return true; }
     return false; };
+  const opacity = e => { let o = 1; for (let p = e; p; p = p.parentElement) o *= +getComputedStyle(p).opacity; return o; };
   const vis = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
-    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && +s.opacity > .05 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && opacity(e) > .05 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; };
   const nm = e => { const c = String(e.className?.baseVal ?? e.className ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 2);
     return `${e.tagName.toLowerCase()}${e.id ? '#' + e.id : ''}${c.length ? '.' + c.join('.') : ''}`; };
   const tx = e => (e.getAttribute('aria-label') || e.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 30);
@@ -117,14 +118,17 @@ export const check = ({ minTarget = 44 } = {}) => {
     const sh = s.boxShadow !== 'none' && !/inset/.test(s.boxShadow), rad = parseFloat(s.borderRadius) || 0;
     return { framed: (bg && (rad > 0 || sh)) || sides.length === 4 || sh, sides, rad, w: r.width, h: r.height, bg }; };
   const lum = ({ r, g, b }) => { const f = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
-  const blend = (top, base) => ({ r: top.r * top.a + base.r * (1 - top.a), g: top.g * top.a + base.g * (1 - top.a), b: top.b * top.a + base.b * (1 - top.a), a: 1 });
-  const opacity = e => { let o = 1; for (let p = e; p; p = p.parentElement) o *= +getComputedStyle(p).opacity; return o; };
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
   const scheme = getComputedStyle(document.documentElement).colorScheme;
   const canvas = /dark/.test(scheme) && (!/light/.test(scheme) || dark) ? { r: 18, g: 18, b: 18, a: 1 } : { r: 255, g: 255, b: 255, a: 1 };
   const opaqueMedia = p => ['CANVAS', 'VIDEO', 'IMG', 'IFRAME', 'svg'].includes(p.tagName) || getComputedStyle(p).backgroundImage !== 'none';
-  // What is painted behind the text: the hit-test stack under its centre. Null when an image, gradient, canvas or video sits behind it.
-  const backdrop = e => {
+  // Premultiplied compositing, so opacity groups are handled the way the browser paints them.
+  const pm = c => ({ r: c.r * c.a, g: c.g * c.a, b: c.b * c.a, a: c.a });
+  const over = (t, b) => ({ r: t.r + b.r * (1 - t.a), g: t.g + b.g * (1 - t.a), b: t.b + b.b * (1 - t.a), a: t.a + b.a * (1 - t.a) });
+  const fade = (c, o) => ({ r: c.r * o, g: c.g * o, b: c.b * o, a: c.a * o });
+  const flat = c => ({ r: c.r, g: c.g, b: c.b, a: 1 });
+  // The colours behind and of the text, as painted: { bg, fg }, or null when an image, gradient, canvas or video sits behind it.
+  const paint = (e, fg) => {
     const r = e.getBoundingClientRect();
     const x = Math.min(Math.max(r.left + r.width / 2, 0), innerWidth - 1), y = Math.min(Math.max(r.top + r.height / 2, 0), innerHeight - 1);
     const stack = document.elementsFromPoint(x, y), i = stack.indexOf(e);
@@ -136,18 +140,35 @@ export const check = ({ minTarget = 44 } = {}) => {
       if (p === e && getComputedStyle(p).backgroundImage !== 'none') return null;
       const c = rgba(getComputedStyle(p).backgroundColor);
       if (c === null) return null;
-      if (c.a > 0) { const a = c.a * opacity(p); layers.push({ ...c, a }); if (a >= 1) break; }
+      if (c.a > 0) { layers.push(p); if (c.a >= 1 && opacity(p) >= 1) break; }
     }
-    let base = canvas; for (const c of layers.reverse()) base = blend(c, base); return base; };
+    const base = pm(canvas);
+    if (layers.every(p => p === e || p.contains(e))) {
+      // Everything behind is an ancestor: paint the chain from the text out, applying each element's opacity to its whole subtree.
+      const chain = []; for (let p = e; p; p = p.parentElement) chain.push(p);
+      const run = withText => { let acc = { r: 0, g: 0, b: 0, a: 0 };
+        for (const p of chain) { const st = getComputedStyle(p);
+          acc = over(acc, pm(rgba(st.backgroundColor) || { r: 0, g: 0, b: 0, a: 0 }));
+          if (p === e && withText) acc = over(pm(fg), acc);
+          acc = fade(acc, +st.opacity); }
+        return flat(over(acc, base)); };
+      return { bg: run(false), fg: run(true) };
+    }
+    // Siblings painted behind: stack the layers bottom-up, each faded by its own opacity.
+    let b = base; for (const p of layers.reverse()) b = over(fade(pm(rgba(getComputedStyle(p).backgroundColor)), opacity(p)), b);
+    return { bg: flat(b), fg: flat(over(fade(pm(fg), opacity(e)), b)) }; };
   const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
   // WCAG 2.5.8 exempts a link inside a sentence: an inline link whose parent has text of its own.
   const inlineLink = e => e.tagName === 'A' && getComputedStyle(e).display === 'inline' && [...(e.parentElement?.childNodes || [])].some(n => n.nodeType === 3 && n.textContent.trim());
   // The hit area of a checkbox or radio includes its label.
-  const hitBox = e => { const r = e.getBoundingClientRect(); let w = r.width, h = r.height;
-    for (const l of [...(e.labels || [])]) { const q = l.getBoundingClientRect(); w = Math.max(w, q.width); h = Math.max(h, q.height); }
-    return { w, h }; };
+  const hitBox = e => { const r = e.getBoundingClientRect(); let { left, top, right, bottom } = r;
+    for (const l of [...(e.labels || [])]) { const q = l.getBoundingClientRect(); if (q.width * q.height > (right - left) * (bottom - top)) ({ left, top, right, bottom } = q); }
+    return { left, top, right, bottom, w: right - left, h: bottom - top }; };
+  // WCAG 2.5.8 exempts controls the browser draws unstyled, such as a native checkbox.
+  const native = e => e.matches('input[type=checkbox],input[type=radio],input[type=range],input[type=color],input[type=file],select') && getComputedStyle(e).appearance !== 'none';
+  const targets = [];
 
-  const hits = { controlInControl: [], boxInBox: [], pillInPill: [], sideStripes: [], dividers: [], smallText: [], tinyCaps: [], middleDots: [], smallTargets: [], lowContrast: [] };
+  const hits = { controlInControl: [], boxInBox: [], pillInPill: [], sideStripes: [], dividers: [], smallText: [], tinyCaps: [], middleDots: [], smallTargets: [], touchTargets: [], lowContrast: [] };
   const out = { words: 0, controls: 0, fontSizes: [], radii: [], contrastUnknown: 0 };
   const sizes = new Set(), radii = new Set();
   for (const e of [...document.querySelectorAll('body *')].filter(vis)) {
@@ -157,8 +178,7 @@ export const check = ({ minTarget = 44 } = {}) => {
     if (e.matches(ctl) && !srOnly) {
       out.controls++;
       const p = e.parentElement?.closest(ctl); if (p && vis(p)) hits.controlInControl.push(`${nm(p)} > ${nm(e)} "${tx(e)}"`);
-      const t = hitBox(e);
-      if ((t.w < minTarget || t.h < minTarget) && !inlineLink(e) && !disabled(e)) hits.smallTargets.push(`${nm(e)} ${Math.round(t.w)}x${Math.round(t.h)} "${tx(e)}"`);
+      if (!inlineLink(e) && !disabled(e)) targets.push({ e, ...hitBox(e) });
     }
     // Card inside a card: a framed block taller than a control inside another framed block. Controls and chips inside a card are fine.
     if (f.framed && f.h > 44 && f.w > 44 && !e.matches(ctl)) {
@@ -175,18 +195,32 @@ export const check = ({ minTarget = 44 } = {}) => {
     const own = [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ').replace(/\s+/g, ' ').trim();
     if (!own || srOnly) continue;
     const px = parseFloat(s.fontSize), ls = parseFloat(s.letterSpacing) || 0;
-    sizes.add(px); out.words += own.split(' ').length;
+    // A CJK character is about half a word; other scripts count by spaces.
+    const cjk = (own.match(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/g) || []).length;
+    const rest = own.replace(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/g, ' ').trim();
+    sizes.add(px); out.words += (rest ? rest.split(/\s+/).length : 0) + Math.ceil(cjk / 2);
     if (px < 13) hits.smallText.push(`"${own.slice(0, 30)}" @${px}px`);
     if ((s.textTransform === 'uppercase' || s.fontVariantCaps.includes('small') || ls / px > 0.03) && px <= 15 && /[a-z]/i.test(own)) hits.tinyCaps.push(`"${own.slice(0, 30)}" @${px}px`);
     if (/ · /.test(own)) hits.middleDots.push(`"${own.slice(0, 50)}"`);
     if (disabled(e)) continue;   // WCAG 1.4.3 exempts inactive controls
-    const fg = rgba(s.color), bg = backdrop(e);
-    if (!fg || !bg || s.textShadow !== 'none' || s.mixBlendMode !== 'normal' || s.filter !== 'none') out.contrastUnknown++;
-    else { const cr = ratio(blend({ ...fg, a: fg.a * opacity(e) }, bg), bg);
-      // Large text (WCAG): 18pt (24px), or 14pt (18.66px) at weight 700 or more.
-      const large = px >= 24 || (px >= 18.66 && +s.fontWeight >= 700), need = large ? 3 : 4.5;
-      if (cr < need) hits.lowContrast.push(`${cr.toFixed(2)}:1 (needs ${need}) "${own.slice(0, 30)}" @${px}px`); }
+    const fg = rgba(s.color), pt = fg && !(e instanceof SVGElement) && s.textShadow === 'none' && s.mixBlendMode === 'normal' && s.filter === 'none' ? paint(e, fg) : null;
+    if (!pt) out.contrastUnknown++;
+    else { const cr = ratio(pt.fg, pt.bg);
+      // Large text (WCAG): 18pt (24px), or 14pt (18.667px) at weight 700 or more.
+      const large = px >= 24 || (px >= 18.6 && +s.fontWeight >= 700), need = large ? 3 : 4.5;
+      if (cr < need) hits.lowContrast.push(`${(Math.floor(cr * 100) / 100).toFixed(2)}:1 (needs ${need}) "${own.slice(0, 30)}" @${px}px`); }
   }
+  // 2.5.8: an undersized target passes if a 24px circle on its centre touches no other target and no other such circle.
+  const small = targets.filter(t => (t.w < 24 || t.h < 24) && !native(t.e));
+  const centre = t => [(t.left + t.right) / 2, (t.top + t.bottom) / 2];
+  const distToBox = ([x, y], t) => Math.hypot(Math.max(t.left - x, 0, x - t.right), Math.max(t.top - y, 0, y - t.bottom));
+  for (const t of small) {
+    const c = centre(t);
+    const crowded = targets.some(o => o !== t && !o.e.contains(t.e) && !t.e.contains(o.e) &&
+      (distToBox(c, o) < 12 || (small.includes(o) && Math.hypot(c[0] - centre(o)[0], c[1] - centre(o)[1]) < 24)));
+    if (crowded) hits.smallTargets.push(`${nm(t.e)} ${Math.round(t.w)}x${Math.round(t.h)} "${tx(t.e)}"`);
+  }
+  if (touch) for (const t of targets) if ((t.w < 44 || t.h < 44) && !native(t.e)) hits.touchTargets.push(`${nm(t.e)} ${Math.round(t.w)}x${Math.round(t.h)} "${tx(t.e)}"`);
   out.fontSizes = [...sizes].sort((a, b) => a - b);
   out.radii = [...radii];
   // Keep one line per distinct hit, with how many times it occurs; counts are totals.
@@ -199,7 +233,6 @@ export const check = ({ minTarget = 44 } = {}) => {
 
 export function summarise(result, phone, waive = []) {
   const budget = BUDGET[phone ? 'phone' : 'desktop'];
-  result.minTarget = MIN_TARGET[phone ? 'phone' : 'desktop'];
   result.waived = FLOOR_KEYS.filter(k => waive.includes(k) && result[k].count > 0);
   result.floor = FLOOR_KEYS.filter(k => result[k].count > 0 && !waive.includes(k));
   result.overBudget = Object.keys(budget).filter(k => result[k] > budget[k]);
@@ -230,7 +263,7 @@ async function main() {
   try { const res = await page.goto(o.url, { waitUntil: 'load', timeout: 45000 }); status = res?.status() ?? null; }
   catch (e) { await fail(`Could not open ${o.url}: ${e.message.split('\n')[0]}`); }
   await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-  if (status && (status < 200 || status > 299)) console.error(`Warning: ${o.url} answered HTTP ${status}; measuring what it shows.`);
+  if (status && (status < 200 || status > 399)) await fail(`${o.url} answered HTTP ${status}; fix the page or the URL first.`);
   await page.waitForTimeout(o.wait);
   for (const sel of o.clicks) {
     try { await page.locator(sel).first().click({ timeout: 10000 }); }
@@ -238,8 +271,11 @@ async function main() {
     await page.waitForTimeout(o.wait);
   }
   const device = o.phone ? 'phone' : 'desktop';
+  let measured;
+  try { measured = await page.evaluate(check, { touch: o.phone }); }
+  catch (e) { await fail(`Could not measure the page: ${e.message.split('\n')[0]}`); }
   const result = summarise({ url: o.url, status, device: `${device} ${o.phone ? '390x844' : '1280x800'}${o.dark ? ' dark' : ''}`,
-    ...(o.units ? { units: o.units } : {}), ...(await page.evaluate(check, { minTarget: MIN_TARGET[device] })) }, o.phone, o.waive);
+    ...(o.units ? { units: o.units } : {}), ...measured }, o.phone, o.waive);
   for (const f of [o.out, o.shot]) if (f) mkdirSync(dirname(resolve(f)), { recursive: true });
   if (o.shot) await page.screenshot(extname(o.shot).toLowerCase() === '.png' ? { path: o.shot, type: 'png' } : { path: o.shot, type: 'jpeg', quality: 80 });
   await browser.close();
@@ -250,7 +286,7 @@ async function main() {
   else {
     const b = BUDGET[device];
     console.log(`${result.device}  words ${result.words}/${b.words}  controls ${result.controls}/${b.controls}  font sizes ${result.fontSizes.length}  radii ${result.radii.length}`);
-    for (const k of ['controlInControl', 'pillInPill', 'boxInBox', 'sideStripes', 'dividers', 'smallText', 'tinyCaps', 'middleDots', 'smallTargets', 'lowContrast'])
+    for (const k of ['controlInControl', 'pillInPill', 'boxInBox', 'sideStripes', 'dividers', 'smallText', 'tinyCaps', 'middleDots', 'smallTargets', ...(o.phone ? ['touchTargets'] : []), 'lowContrast'])
       console.log(`${k.padEnd(17)} ${String(result[k].count).padStart(3)}${result.floor.includes(k) ? '  floor' : result.waived.includes(k) ? '  waived' : ''}`);
     console.log(`contrastUnknown   ${String(result.contrastUnknown).padStart(3)}  (check by eye: text over images, gradients, canvas, blend modes or shadows)`);
     if (result.overBudget.length) console.log(`Over budget: ${result.overBudget.join(', ')} (judge: content does not count)`);

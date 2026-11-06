@@ -112,3 +112,24 @@ test('CLI: writes summary.json, infers the round, reports bad files and fails cl
   assert.equal(c.status, 1);
   assert.match(c.stderr, /^Cannot read .*summary.json/m);
 });
+
+test('expected units: names are matched case-insensitively, unknown names are skipped, thin units block the target', () => {
+  const v = validateJuror({ units: [{ u: 'nav', sub: all(9) }, { u: 'Navv', sub: all(9) }] }, 'j', ['NAV', 'CARD']);
+  assert.deepEqual(v.units.map(u => u.u), ['NAV']);
+  assert.match(v.problems[0], /Navv is not one of the units/);
+  const js = [1, 2, 3, 4, 5, 6].map(i => juror(`j${i}`, i <= 2 ? [['NAV', 9], ['CARD', 9]] : [['NAV', 9]]));
+  const s = aggregate(js, { units: ['NAV', 'CARD'], target: 8.5 });
+  assert.deepEqual(s.thin, ['CARD']);
+  assert.notEqual(s.decision, 'target-reached', 'two of six jurors is too few to call the target reached');
+  const none = aggregate([juror('a', [['NAV', 9]])], { units: ['NAV', 'CARD'] });
+  assert.equal(none.units.find(u => u.u === 'CARD').score, null);
+  assert.equal(none.overall, 9);
+});
+
+test('round number is read only from round-N folder names', () => {
+  const root = mkdtempSync(join(tmpdir(), 'deslop-'));
+  const dir = join(root, '2026-03-02-t3'); mkdirSync(dir);
+  writeFileSync(join(dir, 'juror-01.json'), JSON.stringify({ units: [{ u: 'NAV', sub: all(7) }] }));
+  assert.equal(spawnSync(process.execPath, [script, dir]).status, 0);
+  assert.equal(JSON.parse(readFileSync(join(dir, 'summary.json'), 'utf8')).round, null);
+});

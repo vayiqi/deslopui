@@ -53,7 +53,7 @@ Copy-Item $env:TEMP\deslopui\deslop-ui\agents\*.md .claude\agents\
 
 Restart Claude Code so it sees the new agents. It loads the skill when you ask for a de-slop, taste or "this looks AI-generated" pass, or you can name it: "use deslop-ui on the settings page". It asks whether to run the grading loop before it starts.
 
-Point it, and the jurors, at a local build, a staging site or a test account. They use the product for real, and the skill tells them never to pay, send, delete or change settings, but a staging site is the safe default.
+Point it, and the jurors, at a local build, a staging site or a test account. They use the product for real. The skill tells them never to create, change or send anything other people can see, or anything that costs money, and asks before letting them browse a live production site read-only. A staging site is the safe default.
 
 ### Claude apps
 
@@ -65,21 +65,24 @@ Point the agent at `deslop-ui/SKILL.md`. It is plain Markdown; the references an
 
 ## Run the structural check on its own
 
+From your project, after installing as above:
+
 ```sh
-node deslop-ui/scripts/structure-check.mjs https://example.com            # desktop 1280x800
-node deslop-ui/scripts/structure-check.mjs https://example.com --phone    # phone 390x844
+node .claude/skills/deslop-ui/scripts/structure-check.mjs https://example.com            # desktop 1280x800
+node .claude/skills/deslop-ui/scripts/structure-check.mjs https://example.com --phone    # phone 390x844
+node .claude/skills/deslop-ui/scripts/structure-check.mjs dist/index.html                # a local file
 ```
 
-A local file works too: `node deslop-ui/scripts/structure-check.mjs dist/index.html`.
+(Use `~/.claude/skills/...` for a user-level install.)
 
 If you installed with npm (`npm i -D github:vayiqi/deslopui`), the same commands are `npx deslop-check` and `npx deslop-aggregate`; copy `node_modules/deslopui/deslop-ui` into `.claude/skills/` as above to use the skill.
 
 | Flag | Does |
 |---|---|
-| `--phone` | iPhone 390x844, touch, user agent; targets must be 44px (24px on desktop) |
+| `--phone` | iPhone 390x844, touch, user agent; adds the 44px `touchTargets` house rule |
 | `--dark` | Emulate `prefers-color-scheme: dark` |
 | `--storage-state f.json` | Playwright storage state, for screens behind a sign-in |
-| `--waive tinyCaps,smallText` | House rules your design contract waives (WCAG rules cannot be waived) |
+| `--waive touchTargets,smallText,tinyCaps` | House rules your design contract waives (WCAG rules cannot be waived) |
 | `--json` | Print the JSON result instead of the table |
 | `--click "selector"` | Click before measuring, to reach a state; repeat for several steps |
 | `--wait ms` | Wait after load and after each click (default 3000) |
@@ -90,7 +93,7 @@ If you installed with npm (`npm i -D github:vayiqi/deslopui`), the same commands
 Sample output:
 
 ```
-phone 390x844  words 24/25  controls 4/5  font sizes 3  radii 2
+phone 390x844  words 24/25  controls 7/5  font sizes 3  radii 2
 controlInControl    1  floor
 pillInPill          1
 boxInBox            1
@@ -100,20 +103,22 @@ smallText           1  floor
 tinyCaps            1  floor
 middleDots          1
 smallTargets        3  floor
+touchTargets        6  floor
 lowContrast         1  floor
 contrastUnknown     1  (check by eye: text over images, gradients, canvas, blend modes or shadows)
-Floor: fails controlInControl, lowContrast, smallTargets, smallText, tinyCaps
+Over budget: controls (judge: content does not count)
+Floor: fails controlInControl, lowContrast, smallTargets, touchTargets, smallText, tinyCaps
 ```
 
-Exit code 0 means the Floor passes, 2 that it fails, 1 that the check could not run, so you can use it as a CI gate. Words or controls over the first-view budget print an `Over budget` line; the script cannot tell interface text from content, so that is for you to judge.
+Exit code 0 means the Floor passes, 2 that it fails, 1 that the check could not run (including a page that answers with an HTTP error), so you can use it as a CI gate. Words or controls over the first-view budget print an `Over budget` line; the script cannot tell interface text from content, so that is for you to judge.
 
-The JSON lists every hit with its element and text (repeats as `x3`), so you can find it in the code. Rows marked `floor` block shipping; the others are candidates the skill judges. A segmented control's thumb or a waived brand element can be fine. Colours in any CSS format (hex, rgb, oklch, lab, color-mix) are read as the browser paints them. Disabled controls and visually hidden text are skipped, and a checkbox counts its label as part of its target.
+The JSON lists every hit with its element and text (repeats as `x3`), so you can find it in the code. Rows marked `floor` block shipping; the others are candidates the skill judges. A segmented control's thumb or a waived brand element can be fine. Colours in any CSS format (hex, rgb, oklch, lab, color-mix) are read as the browser paints them, opacity included. Disabled controls, visually hidden text and anything inside a fully transparent parent are skipped. `smallTargets` is WCAG 2.5.8 with its spacing and native-control exceptions; `touchTargets` (phone only) is the stricter 44px house rule, and a checkbox counts its label as part of its target.
 
-What it does not measure: anything below the first view (use `--click` to reach other states), placeholder text, non-text contrast (borders, icons), focus visibility, and text over images, video or canvas (`contrastUnknown`). Check those by eye.
+What it does not measure: anything below the first view (use `--click` to reach other states), content inside shadow DOM or iframes, backgrounds painted by `::before`/`::after`, placeholder text, non-text contrast (borders, icons), focus visibility, and text over images, video or canvas (`contrastUnknown`). Check those by eye.
 
 ## Grading loop
 
-When you start a pass, the skill asks whether to run the loop and, in the same message, for the target score (default 8.5), the round limit (default 6), the URL, a test account if needed, a one-sentence product description, the units to score and the domain expert for lens 6. Each round:
+When you start a pass, the skill asks whether to run the loop and, in the same message, for the target score (default 8.5), the round limit (default 6), jurors per round, the URL, a test account if needed, a one-sentence product description, the units to score and the domain expert for lens 6. Each round:
 
 1. 10 new `deslop-juror` agents, each with a different expert lens (product designer, interaction designer, typographer, accessibility, brand, domain expert, first-time user, mobile, motion, copy), open the product blind and score each unit 1–10 on SYS, COL, TYP, LAY, TXT and SPEC, with fixes.
 2. `aggregate.mjs` checks every juror file, averages them (dropping the highest and lowest), caps each unit at its weakest dimension + 1.5 and at 7.0 if its screen fails the structural Floor, and decides: continue, target reached, plateau, or round limit.
@@ -123,13 +128,13 @@ When you start a pass, the skill asks whether to run the loop and, in the same m
 A plateau is two rounds in a row where the overall moves less than the panel's own noise (at least ±0.2). After a plateau you pick one of the Oracle's bolder directions, and a new series of rounds starts from it.
 
 ```sh
-node deslop-ui/scripts/aggregate.mjs deslop-review/round-4 deslop-review/round-3 --target 8.5 --max-rounds 6
+node .claude/skills/deslop-ui/scripts/aggregate.mjs deslop-review/round-4 deslop-review/round-3 --units CARD,NAV --target 8.5 --max-rounds 6
 ```
 
 ```
 round 4  jurors 10  overall 7.2 (+0.05; moves within ±0.2 are noise)  target 8.5  decision plateau
-CARD        6.9  lowest TXT  fixes 10
-NAV         7.5  lowest SYS  fixes 10
+CARD        6.9  jurors 10  lowest TXT  fixes 10
+NAV         7.5  jurors 10  lowest SYS  fixes 10
 ```
 
 See `deslop-ui/references/grading-loop.md` for the full protocol. A round of 10 jurors costs roughly ten single reviews; use 3–4 jurors for small changes.

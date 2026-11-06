@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Aggregate one grading round. Reads juror-*.json (and check-*.json) in a round folder, writes summary.json.
-// Usage: node aggregate.mjs <round-dir> [previous-round-dir] [--target 8.5] [--round N] [--max-rounds 6]
+// Usage: node aggregate.mjs <round-dir> [previous-round-dir] [--units A,B] [--target 8.5] [--round N] [--max-rounds 6]
 
 import { readdirSync, readFileSync, writeFileSync, existsSync, statSync, realpathSync } from 'node:fs';
 import { join, basename, resolve } from 'node:path';
@@ -18,7 +18,7 @@ export const trimmed = xs => { const s = [...xs].sort((a, b) => a - b); return s
 const unitScore = dimMeans => { const v = Object.values(dimMeans); return Math.min(mean(v), Math.min(...v) + 1.5); };
 
 // Check one juror file. Returns the units that are complete and valid, and a reason for each one that is not.
-export function validateJuror(data, file) {
+export function validateJuror(data, file, expected = null) {
   const problems = [];
   if (!data || typeof data !== 'object' || Array.isArray(data)) return { units: [], problems: [`${file}: not a JSON object`] };
   if (typeof data.error === 'string') return { units: [], problems: [`${file}: the juror could not judge: ${data.error}`] };
@@ -27,22 +27,28 @@ export function validateJuror(data, file) {
   for (const [i, u] of data.units.entries()) {
     const name = typeof u?.u === 'string' && u.u.trim() ? u.u.trim() : null;
     if (!name) { problems.push(`${file}: unit #${i + 1} has no name`); continue; }
+    let u2 = name;
+    if (expected) {
+      u2 = expected.find(x => x.toLowerCase() === name.toLowerCase());
+      if (!u2) { problems.push(`${file}: ${name} is not one of the units (${expected.join(', ')})`); continue; }
+    }
     const bad = DIMS.filter(d => { const x = u.sub?.[d]; return typeof x !== 'number' || !Number.isFinite(x) || x < 1 || x > 10; });
     if (bad.length) { problems.push(`${file}: ${name} missing or out of range 1-10: ${bad.join(', ')}`); continue; }
-    if (units.some(x => x.u === name)) { problems.push(`${file}: ${name} scored twice, kept the first`); continue; }
+    if (units.some(x => x.u === u2)) { problems.push(`${file}: ${name} scored twice, kept the first`); continue; }
     const fixes = Array.isArray(u.fixes) ? u.fixes.filter(f => f && typeof f.fix === 'string') : [];
-    units.push({ u: name, sub: Object.fromEntries(DIMS.map(d => [d, u.sub[d]])), fixes });
+    units.push({ u: u2, sub: Object.fromEntries(DIMS.map(d => [d, u.sub[d]])), fixes });
   }
   return { units, problems };
 }
 
 // Pure aggregation, for tests and the CLI.
 // jurors: [{ file, lens, units }] (already validated). checks: [{ file, floor: [...], units?: [...] }].
-export function aggregate(jurors, { prev = null, checks = [], target = 8.5, round = null, maxRounds = 6 } = {}) {
-  const names = [...new Set(jurors.flatMap(j => j.units.map(u => u.u)))];
+export function aggregate(jurors, { prev = null, checks = [], target = 8.5, round = null, maxRounds = 6, units: expected = null } = {}) {
+  const names = expected || [...new Set(jurors.flatMap(j => j.units.map(u => u.u)))];
   if (!names.length) throw new Error('No valid unit scores in this round.');
   const units = names.map(name => {
     const entries = jurors.flatMap(j => { const e = j.units.find(u => u.u === name); return e ? [{ juror: j.file, lens: j.lens, e }] : []; });
+    if (!entries.length) return { u: name, score: null, jurors: 0, dims: {}, disputed: [], floor: [], capped: false, fixes: [] };
     const dims = {};
     for (const d of DIMS) {
       const xs = entries.map(x => x.e.sub[d]);
@@ -61,35 +67,40 @@ export function aggregate(jurors, { prev = null, checks = [], target = 8.5, roun
     };
   });
 
-  const overall = r2(mean(units.map(u => u.score)));
+  // A unit counts only when at least half the jurors, and at least 3 (or all, if fewer), scored it.
+  const minJurors = Math.min(jurors.length, Math.max(3, Math.ceil(jurors.length / 2)));
+  const thin = units.filter(u => u.jurors < minJurors).map(u => u.u);
+  const scored = units.filter(u => u.score !== null);
+  if (!scored.length) throw new Error('No valid unit scores in this round.');
+  const overall = r2(mean(scored.map(u => u.score)));
   // Noise: how much the overall would move if the panel changed. Each juror's own overall, spread over sqrt(n).
   const perJuror = jurors.filter(j => j.units.length).map(j => mean(j.units.map(u => unitScore(u.sub))));
   const sd = perJuror.length > 1 ? Math.sqrt(perJuror.reduce((a, x) => a + (x - mean(perJuror)) ** 2, 0) / (perJuror.length - 1)) : 0;
   const plateauBand = r2(Math.max(MIN_PLATEAU, perJuror.length > 1 ? 2 * sd / Math.sqrt(perJuror.length) : 0));
 
   const delta = prev ? r2(overall - prev.overall) : null;
-  const regressions = prev ? units.filter(u => { const p = prev.units?.find(x => x.u === u.u); return p && u.score < p.score - 0.5; }).map(u => u.u) : [];
+  const regressions = prev ? scored.filter(u => { const p = prev.units?.find(x => x.u === u.u); return p && u.score < p.score - 0.5; }).map(u => u.u) : [];
   const prevFlat = prev && prev.delta !== null && prev.delta !== undefined && Math.abs(prev.delta) <= (prev.plateauBand ?? MIN_PLATEAU);
   const flat = delta !== null && Math.abs(delta) <= plateauBand;
 
   let decision = 'continue';
-  if (units.every(u => u.score >= target)) decision = 'target-reached';
+  if (!thin.length && units.every(u => u.score >= target)) decision = 'target-reached';
   else if (flat && prevFlat) decision = 'plateau';
   else if (round && round >= maxRounds) decision = 'max-rounds';
 
-  return { round, jurors: jurors.length, target, maxRounds, overall, delta, plateauBand, decision, regressions,
-    units: units.sort((a, b) => a.score - b.score) };
+  return { round, jurors: jurors.length, minJurors, thin, target, maxRounds, overall, delta, plateauBand, decision, regressions,
+    units: units.sort((a, b) => (a.score ?? -1) - (b.score ?? -1)) };
 }
 
 function readJson(path) { return JSON.parse(readFileSync(path, 'utf8')); }
 
-export function loadRound(dir) {
+export function loadRound(dir, expected = null) {
   if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new Error(`Round folder not found: ${dir}`);
   const files = readdirSync(dir).sort();
   const problems = [], jurors = [];
   for (const f of files.filter(f => /^juror-.*\.json$/.test(f))) {
     let data; try { data = readJson(join(dir, f)); } catch (e) { problems.push(`${f}: not valid JSON (${e.message})`); continue; }
-    const v = validateJuror(data, f); problems.push(...v.problems);
+    const v = validateJuror(data, f, expected); problems.push(...v.problems);
     if (v.units.length) jurors.push({ file: f, lens: typeof data.lens === 'string' ? data.lens : f, units: v.units });
   }
   const checks = [];
@@ -110,17 +121,18 @@ function main() {
       let k = args[i], raw;
       if (k.includes('=')) [k, raw] = [k.slice(0, k.indexOf('=')), k.slice(k.indexOf('=') + 1)]; else raw = args[++i];
       const v = Number(raw);
-      if (!['--target', '--round', '--max-rounds'].includes(k)) { console.error(`Unknown option ${k}\n${usage}`); process.exit(1); }
+      if (!['--target', '--round', '--max-rounds', '--units'].includes(k)) { console.error(`Unknown option ${k}\n${usage}`); process.exit(1); }
+      if (k === '--units') { if (!raw || raw.startsWith('--')) { console.error(`--units needs a list\n${usage}`); process.exit(1); } flags[k] = raw.split(',').map(x => x.trim()).filter(Boolean); continue; }
       if (raw === undefined || raw === '' || !Number.isFinite(v)) { console.error(`${k} needs a number\n${usage}`); process.exit(1); }
       flags[k] = v;
     } else pos.push(args[i]);
   }
   const [dir, prevDir] = pos;
   if (!dir || pos.length > 2) { console.error(pos.length > 2 ? `Unexpected argument ${pos[2]}\n${usage}` : usage); process.exit(1); }
-  const round = flags['--round'] ?? (Number(basename(resolve(dir)).match(/(\d+)$/)?.[1]) || null);
+  const round = flags['--round'] ?? (Number(basename(resolve(dir)).match(/^round-(\d+)$/)?.[1]) || null);
 
   let loaded;
-  try { loaded = loadRound(dir); } catch (e) { console.error(e.message); process.exit(1); }
+  try { loaded = loadRound(dir, flags['--units'] || null); } catch (e) { console.error(e.message); process.exit(1); }
   for (const p of loaded.problems) console.error(`skipped ${p}`);
   if (!loaded.jurors.length) { console.error('No usable juror-*.json files in this round.'); process.exit(1); }
   let prev = null;
@@ -131,15 +143,16 @@ function main() {
     catch (e) { console.error(`Cannot read ${p}: ${e.message.split('\n')[0]}`); process.exit(1); }
   }
   let summary;
-  try { summary = aggregate(loaded.jurors, { prev, checks: loaded.checks, round, target: flags['--target'] ?? 8.5, maxRounds: flags['--max-rounds'] ?? 6 }); }
+  try { summary = aggregate(loaded.jurors, { prev, checks: loaded.checks, round, units: flags['--units'] || null, target: flags['--target'] ?? 8.5, maxRounds: flags['--max-rounds'] ?? 6 }); }
   catch (e) { console.error(e.message); process.exit(1); }
   summary.skipped = loaded.problems;
   writeFileSync(join(dir, 'summary.json'), JSON.stringify(summary, null, 2));
 
   const d = summary.delta;
   console.log(`round ${summary.round ?? '?'}  jurors ${summary.jurors}  overall ${summary.overall}${d !== null ? ` (${d >= 0 ? '+' : ''}${d}; moves within ±${summary.plateauBand} are noise)` : ''}  target ${summary.target}  decision ${summary.decision}`);
-  for (const u of summary.units) console.log(`${u.u.padEnd(10)} ${u.score.toFixed(1).padStart(4)}  lowest ${u.lowest}${u.capped ? '  floor-capped' : u.floor.length ? '  floor-fails' : ''}${u.disputed.length ? `  disputed ${u.disputed.join(',')}` : ''}  fixes ${u.fixes.length}`);
+  for (const u of summary.units) console.log(`${u.u.padEnd(10)} ${u.score === null ? '   –' : u.score.toFixed(1).padStart(4)}  jurors ${u.jurors}  lowest ${u.lowest}${u.capped ? '  floor-capped' : u.floor.length ? '  floor-fails' : ''}${u.disputed.length ? `  disputed ${u.disputed.join(',')}` : ''}  fixes ${u.fixes.length}`);
   if (summary.regressions.length) console.log(`regressions: ${summary.regressions.join(', ')}`);
+  if (summary.thin.length) console.log(`too few jurors (under ${summary.minJurors}): ${summary.thin.join(', ')}; rerun jurors before trusting these`);
 }
 
 const isMain = (() => { try { return import.meta.url === pathToFileURL(realpathSync(resolve(process.argv[1] || ''))).href; } catch { return false; } })();

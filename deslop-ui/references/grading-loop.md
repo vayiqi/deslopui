@@ -8,7 +8,7 @@ The loop is opt-in. Before every run, ask the user whether to turn it on, and sa
 
 `$SKILL` below stands for the absolute path of the folder that holds `SKILL.md`; substitute it before running a command. The two agents in `$SKILL/agents/` run best installed as Claude Code subagents (copied to `.claude/agents/` or `~/.claude/agents/`). Where they are not installed, or in other tools, start a fresh general-purpose agent with the agent file's body as its instructions.
 
-Jurors use the product for real, ten at a time. Give them a local build, a staging URL or a test account, never a live account with real money or real people on the other end.
+Jurors use the product for real, ten at a time. Give them a local build or a staging URL, with a test account if needed. They never create, change or send data other people can see; on a live production URL they browse read-only, and only after the user agrees.
 
 ## Inputs (ask the user once, then run)
 
@@ -26,18 +26,18 @@ Jurors use the product for real, ten at a time. Give them a local build, a stagi
 ## One round
 
 ```
-1. Check      node "$SKILL/scripts/structure-check.mjs" <url> --units A,B [--phone] [--waive k] --out round-N/check-<screen>-<device>.json
+1. Check      node "$SKILL/scripts/structure-check.mjs" <url> --units A,B [--phone] [--dark] [--waive k] --out round-N/check-<screen>-<device>.json
 2. Score      10 deslop-juror agents in parallel, each new          -> round-N/juror-01.json ... juror-10.json
-3. Aggregate  node "$SKILL/scripts/aggregate.mjs" round-N [round-(N-1)] --target T --round N --max-rounds M
+3. Aggregate  node "$SKILL/scripts/aggregate.mjs" round-N [round-(N-1)] --units A,B --target T --round N --max-rounds M
                                                                      -> round-N/summary.json
-4. Brief      deslop-oracle agent reads summary.json and the fixes   -> round-N/brief.md
+4. Brief      deslop-oracle reads summary.json, fixes and checks    -> round-N/brief.md
 5. Build      the builder applies brief.md, nothing else (only on continue)
 6. Decide     stop or next round (rules below)
 ```
 
 ### 2. Jurors
 
-- **Blind.** Each juror is a new agent that has never seen the product. It gets the URL, the product sentence, the units, its lens, the path of `values.md` and its output file. Nothing else: no history, no earlier scores, no builder notes, no "what changed", no screenshots you took.
+- **Blind.** Each juror is a new agent that has never seen the product. It gets the URL, a test account if needed, the product sentence, the units, its lens, the absolute path of the skill folder (for `values.md` and the scripts) and the absolute path of its output file. Nothing else: no history, no earlier scores, no builder notes, no "what changed", no screenshots you took.
 - **Never reused.** Every round starts 10 new jurors.
 - **Ten different lenses**, one per juror, so the panel is not one opinion ten times:
 
@@ -70,7 +70,7 @@ Jurors use the product for real, ten at a time. Give them a local build, a stagi
 
 ### 3. Aggregate (deterministic, no model)
 
-`scripts/aggregate.mjs` first checks every juror file. A unit without all six scores, or with a score outside 1–10, is skipped with a reason (listed in `skipped`), and so is a juror that wrote an `error`. Rerun a skipped juror once as a new agent; if it fails again, go on, as long as at least 5 jurors scored every unit. Then, per unit and dimension:
+`scripts/aggregate.mjs` first checks every juror file. A unit without all six scores, or with a score outside 1–10, is skipped with a reason (listed in `skipped`), and so is a juror that wrote an `error`. Rerun a skipped juror once as a new agent. A unit needs scores from at least half the jurors, and at least 3 (all of them when a round has fewer than 3); otherwise it is listed in `thin` and the decision is never `target-reached`. Pass `--units` so a misspelt unit name is skipped instead of becoming a new unit. Then, per unit and dimension:
 
 - **Trimmed mean**: with 5 or more jurors, drop the single highest and lowest score and average the rest. With fewer, the median.
 - **Spread**: highest minus lowest. A spread above 3 marks the dimension `disputed` for the Oracle.
@@ -100,9 +100,9 @@ Applies `brief.md` and nothing else, using the build rules in step 5 of `SKILL.m
 | Rule | Condition | Then |
 |---|---|---|
 | Target reached | Every unit at or above the target score | Stop, report. |
-| Plateau | Overall moved within the plateau band (at least ±0.2), two rounds in a row | Stop polishing. The Oracle proposes 2–3 bolder directions; the user picks one. Build it, then start a new series in `deslop-review/direction-2/round-1`: round numbers, the round limit and the plateau count start again, and its round 1 has no previous folder. |
+| Plateau | Overall moved within the plateau band (at least ±0.2), two rounds in a row | Stop polishing. The Oracle proposes 2–3 bolder directions; the user picks one. Build it, then start a new series in `deslop-review/direction-K/round-1` (K = 2 after the first plateau, 3 after the next): round numbers, the round limit and the plateau count start again, and its round 1 has no previous folder. |
 | Max rounds | Round limit hit | Stop, report the last scores and open fixes. |
-| Regression | A unit drops by more than 0.5 | Revert that unit's last change before the next round. |
+| Regression | A unit drops by more than 0.5 | Revert that unit's last change (one commit per unit per round makes this easy) before the next round. |
 
 Report only the aggregated scores from fresh jurors. Never report a builder's or the Oracle's own opinion as a score.
 
@@ -117,7 +117,7 @@ deslop-review/
     brief.md
   round-2/
   ...
-  direction-2/          after a plateau, a new series
+  direction-2/          after the first plateau, a new series
     round-1/
 ```
 

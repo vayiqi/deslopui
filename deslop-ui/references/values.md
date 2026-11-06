@@ -8,7 +8,7 @@ The values are our own synthesis. They draw on Apple's Human Interface Guideline
 
 *Roots: HIG deference; Rams "unobtrusive"; calm technology.*
 
-The thing people came for (the photo, the map, the scene, the document) fills the screen. Controls sit at the edges, small and quiet, and step back while people work.
+The thing people came for (the photo, the map, the document, the data) fills the screen. Controls sit at the edges, small and quiet, and step back while people work.
 
 - Ask: if I hide every control, is the screen still mostly the content?
 - Check: chrome covers at most about 20% of a viewport during the main task; nothing floats over the content being worked on.
@@ -65,7 +65,7 @@ People spend most of their time in other products. Use the patterns they know, a
 Show options instead of asking people to remember them. Keep choices few and grouped; decision time grows with every option.
 
 - Ask: do I need to remember anything from a previous screen to act on this one?
-- Check: at most 5–7 visible choices per group; options are labelled in place, not explained in a separate help screen.
+- Check: *house heuristic*, at most about 7 visible choices per group; options are labelled in place, not explained in a separate help screen.
 
 ## 8. Forgiving
 
@@ -115,5 +115,5 @@ Care shows in the parts few people notice: alignment, empty states, error states
 ## Using the values
 
 - **When rules conflict**, the lower-numbered value wins, except that 11 (made for everyone) is never traded away.
-- **Jurors** cite a value number with each fix when it applies ("V4: no feedback after a drop"), so the Oracle can group fixes by cause.
+- **Jurors** cite a value number with each fix when it applies ("V4: no feedback after saving"), so the Oracle can group fixes by cause.
 - **The Oracle** prefers fixes that serve more than one value, and drops fixes that would break one.

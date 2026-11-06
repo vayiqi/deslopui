@@ -11,7 +11,7 @@ const fx = name => pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), '
 let browser, page;
 before(async () => { browser = await (await loadPlaywright()).chromium.launch(); page = await browser.newPage({ viewport: { width: 1280, height: 800 } }); });
 after(async () => { await browser?.close(); });
-const run = async (name, waive = []) => { await page.goto(fx(name)); return summarise(await page.evaluate(check, { minTarget: 24 }), false, waive); };
+const run = async (name, waive = []) => { await page.goto(fx(name)); return summarise(await page.evaluate(check, { touch: false }), false, waive); };
 
 test('a clean page passes the Floor with no structural hits', async () => {
   const r = await run('clean.html');
@@ -33,7 +33,8 @@ test('a sloppy page shows every pattern once', async () => {
   assert.equal(r.lowContrast.count, 1);
   assert.equal(r.contrastUnknown, 1, 'text over an image is not guessed');
   assert.ok(!r.smallTargets.hits.some(h => h.includes('"terms"')), 'a link inside a sentence is exempt');
-  assert.ok(r.smallTargets.hits.some(h => h.startsWith('a.small 20x20')));
+  assert.ok(!r.smallTargets.hits.some(h => h.startsWith('a.small')), 'a small target with room around it passes 2.5.8');
+  assert.deepEqual(r.smallTargets.hits, ['a 16x16 "" x3'], 'crowded 16px icons fail 2.5.8');
   assert.deepEqual(r.floor, ['controlInControl', 'lowContrast', 'smallTargets', 'smallText', 'tinyCaps']);
 });
 
@@ -41,6 +42,7 @@ test('house rules can be waived; the waiver is recorded', async () => {
   const r = await run('sloppy.html', ['tinyCaps', 'smallText']);
   assert.deepEqual(r.floor, ['controlInControl', 'lowContrast', 'smallTargets']);
   assert.deepEqual(r.waived, ['smallText', 'tinyCaps']);
+  assert.deepEqual(parseArgs(['https://a.test', '--waive', 'touchTargets']).waive, ['touchTargets'], 'the 44px phone rule is a house rule');
   assert.throws(() => parseArgs(['https://a.test', '--waive', 'lowContrast']), /cannot/);
 });
 
@@ -51,9 +53,9 @@ test('modern colours, disabled controls, hidden text and label hit areas are mea
   assert.equal(r.smallTargets.count, 0, 'a skip link is visually hidden and a checkbox counts its label');
   assert.equal(r.contrastUnknown, 0);
   await page.setViewportSize({ width: 390, height: 844 });
-  const phone = summarise(await page.evaluate(check, { minTarget: 44 }), true);
+  const phone = summarise(await page.evaluate(check, { touch: true }), true);
   await page.setViewportSize({ width: 1280, height: 800 });
-  assert.equal(phone.smallTargets.count, 0);
+  assert.equal(phone.touchTargets.count, 0, 'the 48px label makes the checkbox a 44px target');
 });
 
 test('contrast uses the dark canvas, opacity and what is painted behind', async () => {
@@ -66,7 +68,7 @@ test('contrast uses the dark canvas, opacity and what is painted behind', async 
 
 test('repeated hits are kept with a count', async () => {
   await page.setContent('<style>i{display:inline-block;width:1px;height:20px;background:#999;margin:4px}</style><div><i></i><i></i><i></i></div>');
-  const r = summarise(await page.evaluate(check, { minTarget: 24 }), false);
+  const r = summarise(await page.evaluate(check, { touch: false }), false);
   assert.equal(r.dividers.count, 3);
   assert.equal(r.dividers.hits.length, 1);
   assert.match(r.dividers.hits[0], / x3$/);
@@ -94,4 +96,24 @@ test('CLI exit codes: 0 passes, 2 fails the Floor, 1 cannot run', () => {
   assert.equal(bad.status, 2);
   assert.ok(JSON.parse(bad.stdout).floor.length > 0, '--json prints only JSON');
   assert.equal(spawnSync(process.execPath, [script, 'nope.html']).status, 1);
+});
+
+test('WCAG 2.5.8 spacing, native controls, opacity groups, hidden menus and CJK words', async () => {
+  const r = await run('targets.html');
+  assert.equal(r.smallTargets.count, 0, 'spaced text links, spaced 16px buttons and a native checkbox all pass AA');
+  assert.equal(r.lowContrast.count, 0, 'white on black inside an opacity 0.6 group is about 5.7:1, not counted twice');
+  assert.ok(!JSON.stringify(r).includes('Hidden item'), 'text inside an opacity 0 parent is not measured');
+  assert.equal(r.words, 16, '8 CJK characters count as 4 words');
+  await page.setViewportSize({ width: 390, height: 844 });
+  const phone = summarise(await page.evaluate(check, { touch: true }), true, []);
+  const waived = summarise(await page.evaluate(check, { touch: true }), true, ['touchTargets']);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.ok(phone.floor.includes('touchTargets'));
+  assert.deepEqual(waived.floor, []);
+});
+
+test('CLI refuses folders and non-2xx pages', () => {
+  const dir = spawnSync(process.execPath, [script, dirname(fileURLToPath(import.meta.url))], { encoding: 'utf8' });
+  assert.equal(dir.status, 1);
+  assert.match(dir.stderr, /folder/);
 });

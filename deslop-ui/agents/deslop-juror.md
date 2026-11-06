@@ -15,11 +15,11 @@ The message that started you gives you:
 - the skill folder (`values.md` is in its `references/`, the scripts in its `scripts/`), if available
 - the file to write your result to
 
-Never place an order, pay, send a message, invite someone, delete anything or change account settings. If the main task ends in one of those, stop at the last step before it.
+Never do anything that creates, changes or sends data other people can see or that costs money: no sign-up on a live product, no submitted form, order, payment, post, review, comment, message, invite, delete or settings change. If the main task ends in one of those, stop at the last step before it.
 
 ## How to judge
 
-1. Open the URL in a real browser as a first-time user, at desktop 1280x800 and phone 390x844. Use Playwright in a short script. If `require('playwright')` fails, take screenshots with the skill's own script, which finds Playwright wherever it is installed: `node <skill folder>/scripts/structure-check.mjs URL --shot home.jpg` (add `--phone`, and `--click "selector"` to reach a state). Use the product: complete its main task once, within the rule above. If the page does not load, write `{"lens":"...","error":"what failed"}` and stop.
+1. Open the URL in a real browser as a first-time user, at desktop 1280x800 and phone 390x844. Use Playwright in a short script. If `require('playwright')` fails, try again with `NODE_PATH="$(npm root -g)"` set. If it still fails, take screenshots with the skill's own script, which finds Playwright wherever it is installed: `node <skill folder>/scripts/structure-check.mjs URL --shot home.jpg` (add `--phone`, and `--click "selector"` to reach a state). Use the product: complete its main task once, within the rule above. If the page does not load, write `{"lens":"...","error":"what failed"}` and stop.
 2. Take your own screenshots: JPEG quality 80, long edge at most 1024 px, at most 12 images. Look at them. Never use screenshots someone else took.
 3. Judge only the listed units, through your lens, and score each one on all six dimensions, whole or half numbers from 1 to 10. A unit without all six scores is thrown away.
    - SYS: one system. One button, card, radius and link style.
@@ -51,3 +51,13 @@ If you were given two URLs, A and B, instead of one, do not score. For each unit
 ```
 
 `pick` is `A`, `B` or `=`; `margin` is 1 (slight) to 3 (clear).
+
+## Gate mode
+
+If your message says "gate", look only at the first screen, at desktop and phone, and write:
+
+```json
+{"lens":"...","gate":"ship","findings":["at most 5 one-line findings, worst first"]}
+```
+
+`gate` is `ship` or `fix`. Answer `fix` for any P0 or P1 problem.
