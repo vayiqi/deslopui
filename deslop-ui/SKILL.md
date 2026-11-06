@@ -7,6 +7,8 @@ description: Remove the machine-made look from a product UI by subtraction, meas
 
 The job is subtraction. A pass is judged by what it removes while a stranger still understands each screen in three seconds. Never fix confusion by adding tooltips, coach marks, "?" buttons, helper text or features. Remove whatever causes it.
 
+**Before you start, ask the user one question: run the grading loop or not?** The loop adds 10 blind expert jurors and an Oracle each round and repeats until a target score or a plateau, so it costs many times a single pass. If yes, also ask for the target score (default 8.5) and the round limit (default 6). If no, do a single pass and stop after step 6. Ask every time; never turn the loop on by default.
+
 Two entry points:
 
 - **Existing product**: follow steps 1 to 6.
@@ -114,6 +116,18 @@ For each screen, list every element and string with its one job, and mark it kee
 3. Make a before/after board: the live version beside the new build, at desktop and phone sizes, with one short line per change.
 4. Get a score only from fresh reviewers who have never seen the product. Give them nothing but the URL, one sentence on what the product is, the rubric and the output format. See [references/review-rubric.md](references/review-rubric.md). Never report a score you gave yourself.
 5. **Home gate (new products).** One fresh reviewer looks only at the first screen, on desktop and phone, and answers `ship` or `fix` with at most 5 one-line findings, worst first. Build other pages only after `ship`.
+
+## Grading loop (only when the user turned it on)
+
+Repeat until every unit reaches the user's target score, the overall score moves by 0.2 or less two rounds in a row, or the round limit is hit:
+
+1. Run the structural check.
+2. Start 10 new `deslop-juror` agents in parallel, one per expert lens, each blind: URL, product sentence, units and lens only.
+3. Run `node scripts/aggregate.mjs round-N round-(N-1) --target T --round N` to get trimmed means, unit scores and the decision.
+4. Start a `deslop-oracle` agent on the round folder. It merges and ranks the fixes into `brief.md`, or proposes 2–3 bolder directions on a plateau.
+5. Apply the brief with steps 4–5 of this method, then start the next round with new jurors.
+
+On a plateau, stop and let the user pick a direction. Report only aggregated juror scores. The full protocol, lenses and file layout are in [references/grading-loop.md](references/grading-loop.md); the agent definitions are in `agents/`.
 
 ## Video and motion
 

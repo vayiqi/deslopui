@@ -11,6 +11,7 @@ It covers:
 - **A review rubric** for fresh, no-context reviewers, with six sub-scores (system, colour, type, layout, text, specificity) and P0–P3 severity.
 - **Video rules** for product films: explain with the frame, not with captions.
 - **A structural check script** that reads computed styles in a real browser and counts the patterns above.
+- **An optional grading loop**: each round, 10 blind expert jurors score every unit on six dimensions from 1 to 10, a script averages them, an Oracle turns their fixes into one ranked brief, and the build repeats until the score you set or a plateau. The skill asks before turning it on.
 
 ## Install
 
@@ -22,6 +23,12 @@ Copy the folder into your skills directory, either for one project or for your u
 git clone https://github.com/vayiqi/deslopui.git
 cp -r deslopui/deslop-ui .claude/skills/        # this project only
 cp -r deslopui/deslop-ui ~/.claude/skills/      # every project
+```
+
+For the grading loop, also copy the two agents:
+
+```sh
+mkdir -p .claude/agents && cp deslopui/deslop-ui/agents/*.md .claude/agents/
 ```
 
 Claude loads it when you ask for a de-slop, taste or "this looks AI-generated" pass, or you can name it directly: "use deslop-ui on the settings page".
@@ -71,6 +78,27 @@ smallTargets      5
 
 The JSON lists every hit with its element and text, so you can find it in the code. The script finds candidates; the skill decides. A segmented control's thumb or a waived brand element can be fine.
 
+## Grading loop
+
+When you start a pass, the skill asks whether to run the loop, the target score (default 8.5) and the round limit (default 6). Each round:
+
+1. 10 new `deslop-juror` agents, each with a different expert lens (product designer, interaction designer, typographer, accessibility, brand, domain expert, first-time user, mobile, motion, copy), open the product blind and score each unit 1–10 on SYS, COL, TYP, LAY, TXT and SPEC, with fixes.
+2. `scripts/aggregate.mjs` averages them (dropping the highest and lowest), caps each unit at its weakest dimension + 1.5, and decides: continue, target reached, plateau, or round limit.
+3. A `deslop-oracle` agent merges the fixes into one ranked brief of at most 8, or proposes 2–3 bolder directions on a plateau.
+4. The builder applies the brief, and the next round starts with new jurors.
+
+```sh
+node deslop-ui/scripts/aggregate.mjs deslop-review/round-2 deslop-review/round-1 --target 8.5 --round 2
+```
+
+```
+jurors 10  overall 7 (+0.1)  target 8.5  decision plateau
+CARD        6.6  lowest SYS  disputed TXT  fixes 10
+NAV         7.4  lowest LAY  disputed TXT  fixes 10
+```
+
+See `deslop-ui/references/grading-loop.md` for the full protocol.
+
 ## Files
 
 ```
@@ -79,7 +107,11 @@ deslop-ui/
   references/design-contract.md DESIGN.md template
   references/review-rubric.md   fresh-reviewer tiers, prompt, scoring
   references/video.md           rules for product films
+  references/grading-loop.md    the optional jury + Oracle loop
+  agents/deslop-juror.md        blind expert juror (Claude Code subagent)
+  agents/deslop-oracle.md       merges fixes into one brief
   scripts/structure-check.mjs   computed-style structural check
+  scripts/aggregate.mjs         averages a round, decides whether to stop
 ```
 
 ## Licence
